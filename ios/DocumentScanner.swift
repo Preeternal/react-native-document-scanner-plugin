@@ -23,8 +23,7 @@ public class DocumentScannerImpl: NSObject {
     let responseType = opts["responseType"] as? String
     let quality = opts["croppedImageQuality"] as? Int
 
-    DispatchQueue.main.async { [weak self] in
-      guard let self else { return }
+    DispatchQueue.main.async {
       self.docScanner = DocScanner()
       self.docScanner?.startScan(
         RCTPresentedViewController(),
