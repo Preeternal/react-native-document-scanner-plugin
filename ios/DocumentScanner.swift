@@ -1,50 +1,48 @@
-@available(iOS 13.0, *)
-@objc(DocumentScanner)
-class DocumentScanner: NSObject {
+import Foundation
+import UIKit
+import React
 
-    @objc static func requiresMainQueueSetup() -> Bool {
-        return true
-    }
-    
-    /** @property  documentScanner the document scanner */
-    private var documentScanner: DocScanner?
+@objc(DocumentScannerImpl)
+public class DocumentScannerImpl: NSObject {
+  private var docScanner: DocScanner?
 
-    @objc(scanDocument:withResolver:withRejecter:)
-    func scanDocument(
-      _ options: NSDictionary,
-      resolve: @escaping RCTPromiseResolveBlock,
-      reject: @escaping RCTPromiseRejectBlock
-    ) -> Void {
-        DispatchQueue.main.async {
-            self.documentScanner = DocScanner()
+  @objc static func requiresMainQueueSetup() -> Bool { true }
 
-            // launch the document scanner
-            self.documentScanner?.startScan(
-                RCTPresentedViewController(),
-                successHandler: { (scannedDocumentImages: [String]) in
-                    // document scan success
-                    resolve([
-                        "status": "success",
-                        "scannedImages": scannedDocumentImages
-                    ])
-                    self.documentScanner = nil
-                },
-                errorHandler: { (errorMessage: String) in
-                    // document scan error
-                    reject("document scan error", errorMessage, nil)
-                    self.documentScanner = nil
-                },
-                cancelHandler: {
-                    // when user cancels document scan
-                    resolve([
-                        "status": "cancel"
-                    ])
-                    self.documentScanner = nil
-                },
-                responseType: options["responseType"] as? String,
-                croppedImageQuality: options["croppedImageQuality"] as? Int
-            )
-        }
+  @objc(scanDocument:resolve:reject:)
+  public func scanDocument(
+    _ options: NSDictionary,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    guard #available(iOS 13.0, *) else {
+      reject("unsupported_ios", "iOS 13.0 or higher required", nil)
+      return
     }
 
+    let opts = options as? [String: Any] ?? [:]
+    let responseType = opts["responseType"] as? String
+    let quality = opts["croppedImageQuality"] as? Int
+
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.docScanner = DocScanner()
+      self.docScanner?.startScan(
+        RCTPresentedViewController(),
+        successHandler: { images in
+          resolve(["status": "success", "scannedImages": images])
+          self.docScanner = nil
+        },
+        errorHandler: { msg in
+          reject("document_scan_error", msg, nil)
+          self.docScanner = nil
+        },
+        cancelHandler: {
+          resolve(["status": "cancel"])
+          self.docScanner = nil
+        },
+        responseType: responseType,
+        croppedImageQuality: quality
+      )
+    }
+  }
 }

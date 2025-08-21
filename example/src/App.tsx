@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Image } from 'react-native';
-import DocumentScanner from 'react-native-document-scanner-plugin';
+import { useState, useEffect } from 'react';
+import { Image, StyleSheet } from 'react-native';
+import DocumentScanner from '@preeternal/react-native-document-scanner-plugin';
 
 export default () => {
   const [scannedImage, setScannedImage] = useState<any>();
@@ -24,10 +24,9 @@ export default () => {
     scanDocument();
   }, []);
 
-  return (
-    <Image
-      style={{ width: '100%', height: '100%' }}
-      source={{ uri: scannedImage }}
-    />
-  );
+  return <Image style={styles.image} source={{ uri: scannedImage }} />;
 };
+
+const styles = StyleSheet.create({
+  image: { width: '100%', height: '100%' },
+});

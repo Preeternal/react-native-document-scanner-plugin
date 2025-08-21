@@ -1,6 +1,8 @@
-# React Native Document Scanner
+# @preeternal/react-native-document-scanner-plugin
 
-[![Npm package version](https://img.shields.io/npm/v/react-native-document-scanner-plugin/latest.svg?style=for-the-badge&logo=npm)](https://www.npmjs.com/package/react-native-document-scanner-plugin) [![npm dev dependency version](https://img.shields.io/npm/dependency-version/react-native-document-scanner-plugin/dev/react-native?color=61DAFB&logo=react&style=for-the-badge)](https://github.com/WebsiteBeaver/react-native-document-scanner-plugin/blob/master/package.json)
+Fork of [react-native-document-scanner-plugin](https://github.com/WebsiteBeaver/react-native-document-scanner-plugin) with New Architecture (TurboModule) support and active maintenance.
+
+> **Attribution**: This package is a community‑maintained fork of the original project by **WebsiteBeaver**. Demo videos embedded below are from the original repository and are credited to their respective owners.
 
 This is a React Native plugin that lets you scan documents using Android and iOS. You can use it to create
 apps that let users scan notes, homework, business cards, receipts, or anything with a rectangular shape.
@@ -9,10 +11,10 @@ apps that let users scan notes, homework, business cards, receipts, or anything 
 | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | ![Dollar-iOS](https://user-images.githubusercontent.com/26162804/160485984-e6c46563-56ee-4be9-b241-34a186e0029d.gif) | ![Dollar Android](https://user-images.githubusercontent.com/26162804/160306955-af9c5dd6-5cdf-4e2c-8770-c734a594985d.gif) |
 
-## Install
+## Installation
 
 ```bash
-npm install react-native-document-scanner-plugin
+yarn add @preeternal/react-native-document-scanner-plugin
 ```
 
 After installing the plugin, you need to follow the steps below
@@ -26,17 +28,18 @@ After installing the plugin, you need to follow the steps below
 - `NSCameraUsageDescription` (`Privacy - Camera Usage Description`)
 
 3. Install pods by running
+
 ```bash
-cd ios && pod install && cd ..
+cd ios && bundle exec pod install && cd ..
 ```
 
 ### Android
 
-1. Open `android/gradle.properties` and add `org.gradle.jvmargs=-Xmx2048m`
-
 **Note:** You don't need to prompt the user to accept camera permissions for this plugin to work unless you're using another plugin that requires the user to accept camera permissions. See [Android Camera Permissions](#android-camera-permissions).
 
 ## Examples
+
+> Demo media in this README is courtesy of the original project (WebsiteBeaver).
 
 * [Basic Example](#basic-example)
 * [Limit Number of Scans](#limit-number-of-scans)
@@ -46,7 +49,7 @@ cd ios && pod install && cd ..
 ```javascript
 import React, { useState, useEffect } from 'react'
 import { Image } from 'react-native'
-import DocumentScanner from 'react-native-document-scanner-plugin'
+import DocumentScanner from '@preeternal/react-native-document-scanner-plugin'
 
 export default () => {
   const [scannedImage, setScannedImage] = useState();
@@ -108,7 +111,7 @@ maxNumDocuments to 2. This only works on Android.
 ```javascript
 import React, { useState, useEffect } from 'react'
 import { Image } from 'react-native'
-import DocumentScanner from 'react-native-document-scanner-plugin'
+import DocumentScanner from '@preeternal/react-native-document-scanner-plugin'
 
 export default () => {
   const [scannedImage, setScannedImage] = useState();
@@ -142,6 +145,12 @@ export default () => {
 ```
 
 <video src="https://user-images.githubusercontent.com/26162804/161643345-6fe15f33-9414-46f5-b5d5-24d88948e801.mp4" data-canonical-src="https://user-images.githubusercontent.com/26162804/161643345-6fe15f33-9414-46f5-b5d5-24d88948e801.mp4" controls="controls" muted="muted" class="d-block rounded-bottom-2 border-top width-fit" style="max-height:640px;"></video>
+
+## Differences from the original
+
+- Added React Native **New Architecture (TurboModule)** support.
+- Swift‑based iOS bridge with an ObjC++ TurboModule shim.
+- Minor documentation updates and ongoing maintenance.
 
 ## Documentation
 
@@ -204,37 +213,6 @@ Opens the camera, and starts the document scan
 | **`Base64`**        | <code>'base64'</code>        | Use this response type if you want document scan returned as base64 images.     |
 | **`ImageFilePath`** | <code>'imageFilePath'</code> | Use this response type if you want document scan returned as inmage file paths. |
 
-## Expo
-
-This plugin doesn't run in Expo Go. It works with Expo, and you can avoid manually changing iOS and Android files by following these steps.
-
-```bash
-npx expo install react-native-document-scanner-plugin
-```
-
-Add `react-native-document-scanner-plugin` to plugins in `app.json` or `app.config.json`.
-
-```javascript
-{
-  "name": "my expo app",
-  "plugins": [
-    [
-      "react-native-document-scanner-plugin",
-      {
-        "cameraPermission": "We need camera access, so you can scan documents"
-      }
-    ]
-  ]
-}
-```
-
-```bash
-npx expo prebuild
-```
-or
-```bash
-eas build
-```
 
 ## Common Mistakes
 
@@ -252,7 +230,7 @@ Here's an example of how to request camera permissions.
 ```javascript
 import React, { useState, useEffect } from 'react'
 import { Platform, PermissionsAndroid, Image, Alert } from 'react-native'
-import DocumentScanner from 'react-native-document-scanner-plugin'
+import DocumentScanner from '@preeternal/react-native-document-scanner-plugin'
 
 export default () => {
   const [scannedImage, setScannedImage] = useState();
@@ -291,12 +269,17 @@ export default () => {
 }
 ```
 
+## Contributing
+
+- [Development workflow](CONTRIBUTING.md#development-workflow)
+- [Sending a pull request](CONTRIBUTING.md#sending-a-pull-request)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+
+## Credits
+
+This project builds on the excellent work by [WebsiteBeaver/react-native-document-scanner-plugin](https://github.com/WebsiteBeaver/react-native-document-scanner-plugin). The original repository is MIT‑licensed; original copyright notices are preserved in this fork’s LICENSE.
+
 ## License
 
-Copyright 2022 David Marcus
+MIT
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
