@@ -1,4 +1,4 @@
-package com.reactnativedocumentscanner
+package com.preeternal.scanner
 
 import com.facebook.react.BaseReactPackage
 import com.facebook.react.bridge.NativeModule

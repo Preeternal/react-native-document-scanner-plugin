@@ -1,5 +1,5 @@
 {
-  "name": "react-native-document-scanner-plugin-example",
+  "name": "@preeternal/react-native-document-scanner-plugin-example",
   "version": "0.0.1",
   "private": true,
   "scripts": {

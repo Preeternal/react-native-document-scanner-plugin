@@ -1,4 +1,4 @@
-package reactnativedocumentscanner.example
+package preeternal.scanner.example
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

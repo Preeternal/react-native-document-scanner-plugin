@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Image, StyleSheet } from 'react-native';
-import DocumentScanner from 'react-native-document-scanner-plugin';
+import DocumentScanner from '@preeternal/react-native-document-scanner-plugin';
 
 export default () => {
   const [scannedImage, setScannedImage] = useState<any>();

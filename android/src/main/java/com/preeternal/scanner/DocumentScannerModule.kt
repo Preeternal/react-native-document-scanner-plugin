@@ -1,4 +1,4 @@
-package com.reactnativedocumentscanner
+package com.preeternal.scanner
 
 import android.app.Activity
 import android.graphics.Bitmap

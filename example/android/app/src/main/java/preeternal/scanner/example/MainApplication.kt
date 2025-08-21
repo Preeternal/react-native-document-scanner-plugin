@@ -1,4 +1,4 @@
-package reactnativedocumentscanner.example
+package preeternal.scanner.example
 
 import android.app.Application
 import com.facebook.react.PackageList

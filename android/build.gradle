@@ -26,7 +26,7 @@ def getExtOrIntegerDefault(name) {
 }
 
 android {
-  namespace "com.reactnativedocumentscanner"
+  namespace "com.preeternal.scanner"
 
   compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
 

@@ -1,7 +1,7 @@
 {
-  "name": "react-native-document-scanner-plugin",
-  "version": "1.0.2",
-  "description": "A React Native plugin that lets you scan documents using Android and iOS",
+  "name": "@preeternal/react-native-document-scanner-plugin",
+  "version": "0.1.0",
+  "description": "Fork of react-native-document-scanner-plugin with New Architecture (TurboModule) support and active maintenance.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
   "exports": {
@@ -32,7 +32,7 @@
     "!**/.*"
   ],
   "scripts": {
-    "example": "yarn workspace react-native-document-scanner-plugin-example",
+    "example": "yarn workspace @preeternal/react-native-document-scanner-plugin-example",
     "test": "jest",
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
@@ -47,14 +47,14 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/websitebeaver/react-native-document-scanner-plugin.git"
+    "url": "git+https://github.com/Preeternal/react-native-document-scanner-plugin.git"
   },
-  "author": "David Marcus <david@websitebeaver.com> (https://github.com/websitebeaver)",
+  "author": "Preeternal <preeternal@gmail.com> (https://github.com/Preeternal)",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/websitebeaver/react-native-document-scanner-plugin/issues"
+    "url": "https://github.com/Preeternal/react-native-document-scanner-plugin/issues"
   },
-  "homepage": "https://github.com/websitebeaver/react-native-document-scanner-plugin#readme",
+  "homepage": "https://github.com/Preeternal/react-native-document-scanner-plugin#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
@@ -153,7 +153,7 @@
     "type": "modules",
     "jsSrcsDir": "src",
     "android": {
-      "javaPackageName": "com.reactnativedocumentscanner"
+      "javaPackageName": "com.preeternal.scanner"
     }
   },
   "create-react-native-library": {
