@@ -1,5 +1,8 @@
 # @preeternal/react-native-document-scanner-plugin
 
+[![npm version](https://img.shields.io/npm/v/@preeternal/react-native-document-scanner-plugin.svg)](https://www.npmjs.com/package/@preeternal/react-native-document-scanner-plugin)
+[![npm downloads](https://img.shields.io/npm/dm/@preeternal/react-native-document-scanner-plugin.svg)](https://www.npmjs.com/package/@preeternal/react-native-document-scanner-plugin)
+
 Fork of [react-native-document-scanner-plugin](https://github.com/WebsiteBeaver/react-native-document-scanner-plugin) with New Architecture (TurboModule) support and active maintenance.
 
 > **Attribution**: This package is a community‑maintained fork of the original project by **WebsiteBeaver**. Demo videos embedded below are from the original repository and are credited to their respective owners.
