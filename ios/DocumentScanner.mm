@@ -1,6 +1,14 @@
 #import "DocumentScanner.h"
 #import <VisionKit/VisionKit.h>
+
+// Универсально для разных режимов (framework/static)
+#if __has_include(<DocumentScanner/DocumentScanner-Swift.h>)
+#import <DocumentScanner/DocumentScanner-Swift.h>
+#elif __has_include("DocumentScanner-Swift.h")
 #import "DocumentScanner-Swift.h"
+#else
+#warning "DocumentScanner-Swift.h not found at build time"
+#endif
 
 @interface DocumentScanner ()
 @property (nonatomic, strong) DocumentScannerImpl *impl;

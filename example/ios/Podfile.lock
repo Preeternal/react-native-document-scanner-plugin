@@ -1,6 +1,6 @@
 PODS:
   - boost (1.84.0)
-  - DocumentScanner (0.1.0):
+  - DocumentScanner (0.2.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1907,7 +1907,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
-  DocumentScanner: 216c929be5be5abde06c5e491c0614d81c64650e
+  DocumentScanner: cf7a7cb0334157da613037de50ff33a6fd6b4138
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
   fast_float: 06eeec4fe712a76acc9376682e4808b05ce978b6
   FBLazyVector: 84b955f7b4da8b895faf5946f73748267347c975
@@ -1951,14 +1951,14 @@ SPEC CHECKSUMS:
   React-performancetimeline: 5b0dfc0acba29ea0269ddb34cd6dd59d3b8a1c66
   React-RCTActionSheet: a499b0d6d9793886b67ba3e16046a3fef2cdbbc3
   React-RCTAnimation: cc64adc259aabc3354b73065e2231d796dfce576
-  React-RCTAppDelegate: 67e2ec7a321f581a36cd65dfe6c9350b88b51686
+  React-RCTAppDelegate: 9d523da768f1c9e84c5f3b7e3624d097dfb0e16b
   React-RCTBlob: e727f53eeefded7e6432eb76bd22b57bc880e5d1
-  React-RCTFabric: f67ec0aed20d583bb6572bcfb2e8d5b17597b62d
-  React-RCTFBReactNativeSpec: 971b40c8e3a834e23689610ef5d164beff787876
+  React-RCTFabric: 58590aa4fdb4ad546c06a7449b486cf6844e991f
+  React-RCTFBReactNativeSpec: 9064c63d99e467a3893e328ba3612745c3c3a338
   React-RCTImage: 7159cbdbb18a09d97ba1a611416eced75b3ccb29
   React-RCTLinking: 46293afdb859bccc63e1d3dedc6901a3c04ef360
   React-RCTNetwork: 4a6cd18f5bcd0363657789c64043123a896b1170
-  React-RCTRuntime: 923732ea6440d61bbd71fbd09f5d86d4d119f6fb
+  React-RCTRuntime: 5ab904fd749aa52f267ef771d265612582a17880
   React-RCTSettings: 61e361dc85136d1cb0e148b7541993d2ee950ea7
   React-RCTText: abd1e196c3167175e6baef18199c6d9d8ac54b4e
   React-RCTVibration: 490e0dcb01a3fe4a0dfb7bc51ad5856d8b84f343
@@ -1979,6 +1979,6 @@ SPEC CHECKSUMS:
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: c758bfb934100bb4bf9cbaccb52557cee35e8bdf
 
-PODFILE CHECKSUM: 72689917884067d02a0ab7bb20fd5ed3c8ac7952
+PODFILE CHECKSUM: 3bac4b33e4363d4fdab8ce1512515eb7df56f4db
 
 COCOAPODS: 1.15.2
