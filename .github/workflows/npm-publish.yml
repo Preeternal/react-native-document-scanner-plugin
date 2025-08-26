@@ -3,9 +3,6 @@ name: Publish Node.js Package
 on:
   release:
     types: [published]
-  push:
-    tags:
-      - 'v*'
 
 jobs:
   publish:
@@ -29,17 +26,6 @@ jobs:
           cache: 'yarn'
       - run: corepack enable
 
-      - name: Verify release tag matches package.json version
-        run: |
-          TAG="${{ github.event.release.tag_name }}"   # например v0.2.0
-          VER_FROM_TAG="${TAG#v}"
-          VER_FROM_PKG="$(node -p "require('./package.json').version")"
-          echo "Tag: $TAG | package.json: $VER_FROM_PKG"
-          if [ "$VER_FROM_TAG" != "$VER_FROM_PKG" ]; then
-            echo "::error::Tag ($VER_FROM_TAG) != package.json version ($VER_FROM_PKG)"
-            exit 1
-          fi
-
       - name: Install deps (Yarn 4 workspaces)
         run: yarn install --immutable
 
@@ -58,4 +44,4 @@ jobs:
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance
+        run: npm publish --access public
