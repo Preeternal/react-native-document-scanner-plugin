@@ -3,12 +3,10 @@
 [![npm version](https://img.shields.io/npm/v/@preeternal/react-native-document-scanner-plugin.svg)](https://www.npmjs.com/package/@preeternal/react-native-document-scanner-plugin)
 [![npm downloads](https://img.shields.io/npm/dm/@preeternal/react-native-document-scanner-plugin.svg)](https://www.npmjs.com/package/@preeternal/react-native-document-scanner-plugin)
 
-```
+
 > ### Heads‑up: Upstream now supports New Architecture
 > The original project, [WebsiteBeaver/react-native-document-scanner-plugin](https://github.com/WebsiteBeaver/react-native-document-scanner-plugin), now ships **New Architecture (TurboModule)** support as well.  
 > This fork remains **actively maintained** and API‑compatible. If you prefer the upstream package, you can safely use it; if you already rely on this fork, you can continue without changes.
-```
-
 
 Fork of [react-native-document-scanner-plugin](https://github.com/WebsiteBeaver/react-native-document-scanner-plugin) with New Architecture (TurboModule) support and active maintenance.
 
