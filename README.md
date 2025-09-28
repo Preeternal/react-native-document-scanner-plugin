@@ -3,7 +3,19 @@
 [![npm version](https://img.shields.io/npm/v/@preeternal/react-native-document-scanner-plugin.svg)](https://www.npmjs.com/package/@preeternal/react-native-document-scanner-plugin)
 [![npm downloads](https://img.shields.io/npm/dm/@preeternal/react-native-document-scanner-plugin.svg)](https://www.npmjs.com/package/@preeternal/react-native-document-scanner-plugin)
 
+```
+> ### Heads‑up: Upstream now supports New Architecture
+> The original project, [WebsiteBeaver/react-native-document-scanner-plugin](https://github.com/WebsiteBeaver/react-native-document-scanner-plugin), now ships **New Architecture (TurboModule)** support as well.  
+> This fork remains **actively maintained** and API‑compatible. If you prefer the upstream package, you can safely use it; if you already rely on this fork, you can continue without changes.
+```
+
+
 Fork of [react-native-document-scanner-plugin](https://github.com/WebsiteBeaver/react-native-document-scanner-plugin) with New Architecture (TurboModule) support and active maintenance.
+
+## Which package should I use?
+
+- **Use the upstream package** (`react-native-document-scanner-plugin`) if you want to stay on the original repository now that it also supports New Architecture.
+- **Use this fork** (`@preeternal/react-native-document-scanner-plugin`) if you want quicker iteration on fixes, Expo/EAS build hardening, and a maintained release cadence. The public API is identical.
 
 > **Attribution**: This package is a community‑maintained fork of the original project by **WebsiteBeaver**. Demo videos embedded below are from the original repository and are credited to their respective owners.
 
@@ -151,8 +163,8 @@ export default () => {
 
 ## Differences from the original
 
-- Added React Native **New Architecture (TurboModule)** support.
-- Swift‑based iOS bridge with an ObjC++ TurboModule shim.
+- New Architecture (TurboModule) support — **now also available upstream**; this fork shipped it earlier and keeps parity.
+- Additional hardening for Expo/EAS and CI examples.
 - Minor documentation updates and ongoing maintenance.
 
 ## Documentation
@@ -271,6 +283,24 @@ export default () => {
   )
 }
 ```
+
+## Migrating between upstream and this fork
+
+Both packages expose the same public API. To switch:
+
+- **From this fork to upstream**
+  ```bash
+  yarn remove @preeternal/react-native-document-scanner-plugin
+  yarn add react-native-document-scanner-plugin
+  cd ios && pod install && cd -
+  ```
+
+- **From upstream to this fork**
+  ```bash
+  yarn remove react-native-document-scanner-plugin
+  yarn add @preeternal/react-native-document-scanner-plugin
+  cd ios && pod install && cd -
+  ```
 
 ## Contributing
 
