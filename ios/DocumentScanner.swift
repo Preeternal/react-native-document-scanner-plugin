@@ -22,15 +22,21 @@ public class DocumentScannerImpl: NSObject {
     let opts = options as? [String: Any] ?? [:]
     let responseType = opts["responseType"] as? String
     let quality = opts["croppedImageQuality"] as? Int
+    let isBase64Response = responseType?.lowercased() == "base64"
 
     DispatchQueue.main.async {
       self.docScanner = DocScanner()
       self.docScanner?.startScan(
         RCTPresentedViewController(),
         successHandler: { images in
-          let sanitized = images.compactMap { raw -> String? in
+          let fm = FileManager.default
+          let sanitized: [String] = images.compactMap { raw -> String? in
             let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            return trimmed.isEmpty ? nil : trimmed
+            guard !trimmed.isEmpty else { return nil }
+            if !isBase64Response && !fm.fileExists(atPath: trimmed) {
+              return nil
+            }
+            return trimmed
           }
           resolve([
             "status": "success",
