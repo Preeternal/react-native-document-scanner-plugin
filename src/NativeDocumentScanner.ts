@@ -40,21 +40,6 @@ export enum ResponseType {
 }
 
 /**
- * Scan result payload.
- */
-export interface ScanDocumentResponse {
-  /**
-   * Array of scanned images (file paths or base64 strings depending on responseType).
-   */
-  scannedImages?: string[];
-
-  /**
-   * The final status of the scan flow.
-   */
-  status?: ScanDocumentResponseStatus;
-}
-
-/**
  * Status of the scan flow.
  */
 export enum ScanDocumentResponseStatus {
@@ -68,6 +53,18 @@ export enum ScanDocumentResponseStatus {
    */
   Cancel = 'cancel',
 }
+
+type ScanDocumentSuccess = {
+  status: ScanDocumentResponseStatus.Success;
+  scannedImages: string[];
+};
+
+type ScanDocumentCancel = {
+  status: ScanDocumentResponseStatus.Cancel;
+  scannedImages: [];
+};
+
+export type ScanDocumentResponse = ScanDocumentSuccess | ScanDocumentCancel;
 
 /**
  * TurboModule spec.

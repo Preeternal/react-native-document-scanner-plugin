@@ -28,7 +28,14 @@ public class DocumentScannerImpl: NSObject {
       self.docScanner?.startScan(
         RCTPresentedViewController(),
         successHandler: { images in
-          resolve(["status": "success", "scannedImages": images])
+          let sanitized = images.compactMap { raw -> String? in
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+          }
+          resolve([
+            "status": "success",
+            "scannedImages": sanitized
+          ])
           self.docScanner = nil
         },
         errorHandler: { msg in
@@ -36,7 +43,10 @@ public class DocumentScannerImpl: NSObject {
           self.docScanner = nil
         },
         cancelHandler: {
-          resolve(["status": "cancel"])
+          resolve([
+            "status": "cancel",
+            "scannedImages": []
+          ])
           self.docScanner = nil
         },
         responseType: responseType,

@@ -84,10 +84,11 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
       val promise = pendingPromise ?: return@register
       val options = pendingOptions
       val response = WritableNativeMap()
+      val images = WritableNativeArray()
+      response.putArray("scannedImages", images)
 
       if (result.resultCode == Activity.RESULT_OK) {
         val docResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
-        val arr = WritableNativeArray()
 
         docResult?.pages?.forEach { page ->
           val uri = page.imageUri
@@ -103,15 +104,17 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
               return@register
             }
           } else {
-            uri.toString()
+            uri?.toString()
           }
-          arr.pushString(value)
+
+          if (!value.isNullOrBlank()) {
+            images.pushString(value)
+          }
         }
 
-        response.putArray("scannedImages", arr)
         response.putString("status", "success")
         promise.resolve(response)
-      } else if (result.resultCode == Activity.RESULT_CANCELED) {
+      } else {
         response.putString("status", "cancel")
         promise.resolve(response)
       }
