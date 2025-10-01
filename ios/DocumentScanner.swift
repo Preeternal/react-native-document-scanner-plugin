@@ -33,8 +33,16 @@ public class DocumentScannerImpl: NSObject {
           let sanitized: [String] = images.compactMap { raw -> String? in
             let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
-            if !isBase64Response && !fm.fileExists(atPath: trimmed) {
-              return nil
+            if !isBase64Response {
+              let path: String
+              if let url = URL(string: trimmed), url.isFileURL {
+                path = url.path
+              } else {
+                path = trimmed
+              }
+              if !fm.fileExists(atPath: path) {
+                return nil
+              }
             }
             return trimmed
           }

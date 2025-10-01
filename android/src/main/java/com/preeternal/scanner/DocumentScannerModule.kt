@@ -4,11 +4,13 @@ import android.app.Activity
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.WindowCompat
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReadableMap
@@ -21,6 +23,7 @@ import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import java.io.ByteArrayOutputStream
 import java.io.FileNotFoundException
+import java.lang.ref.WeakReference
 
 @ReactModule(name = DocumentScannerModule.NAME)
 class DocumentScannerModule(reactContext: ReactApplicationContext) :
@@ -28,6 +31,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
 
   companion object {
     const val NAME = "DocumentScanner"
+    private const val ANDROID_15_API = 35
   }
 
   override fun getName(): String = NAME
@@ -37,6 +41,9 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
   private var pendingOptions: ReadableMap? = null
   private var pendingQuality: Int = 100
   private var scanner: GmsDocumentScanner? = null
+
+  private var hostActivityRef: WeakReference<ComponentActivity>? = null
+  private var previousFitsSystemWindows: Boolean? = null
 
   override fun scanDocument(options: ReadableMap, promise: Promise) {
     val activity = currentActivity
@@ -56,7 +63,11 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
 
     pendingPromise = promise
     pendingOptions = options
-    pendingQuality = if (options.hasKey("croppedImageQuality")) options.getInt("croppedImageQuality") else 100
+    pendingQuality =
+      if (options.hasKey("croppedImageQuality")) options.getInt("croppedImageQuality") else 100
+
+    hostActivityRef = WeakReference(componentActivity)
+    ensureSystemBarsVisible(componentActivity)
 
     initLauncher(componentActivity)
     initScanner(options)
@@ -85,39 +96,39 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
       val options = pendingOptions
       val response = WritableNativeMap()
       val images = WritableNativeArray()
-      response.putArray("scannedImages", images)
 
       if (result.resultCode == Activity.RESULT_OK) {
         val docResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
 
+        val responseType = options?.getString("responseType")?.lowercase()
+
         docResult?.pages?.forEach { page ->
           val uri = page.imageUri
-          val value = if (
-            options?.hasKey("responseType") == true &&
-            options.getString("responseType") == "base64"
-          ) {
-            try {
+          if (responseType == "base64") {
+            if (uri == null) return@forEach
+            val encoded = try {
               uriToBase64(activity, uri, pendingQuality)
             } catch (e: FileNotFoundException) {
               promise.reject("document_scan_error", e.message)
               clearPending()
               return@register
             }
-          } else {
-            uri?.toString()
-          }
 
-          if (!value.isNullOrBlank()) {
-            images.pushString(value)
+            if (encoded.isNotBlank()) {
+              images.pushString(encoded)
+            }
+          } else if (uri != null && canReadUri(activity, uri)) {
+            images.pushString(uri.toString())
           }
         }
 
         response.putString("status", "success")
-        promise.resolve(response)
       } else {
         response.putString("status", "cancel")
-        promise.resolve(response)
       }
+
+      response.putArray("scannedImages", images)
+      promise.resolve(response)
 
       clearPending()
     }
@@ -159,5 +170,40 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     pendingPromise = null
     pendingOptions = null
     pendingQuality = 100
+    restoreSystemBars()
+  }
+
+  private fun ensureSystemBarsVisible(activity: ComponentActivity) {
+    if (Build.VERSION.SDK_INT < ANDROID_15_API) return
+    if (previousFitsSystemWindows != null) return
+
+    val decor = activity.window.decorView
+    @Suppress("DEPRECATION")
+    val original = decor.fitsSystemWindows
+    previousFitsSystemWindows = original
+    WindowCompat.setDecorFitsSystemWindows(activity.window, true)
+  }
+
+  private fun restoreSystemBars() {
+    if (Build.VERSION.SDK_INT < ANDROID_15_API) return
+    val previous = previousFitsSystemWindows ?: return
+    hostActivityRef?.get()?.let { activity ->
+      WindowCompat.setDecorFitsSystemWindows(activity.window, previous)
+    }
+    previousFitsSystemWindows = null
+    hostActivityRef = null
+  }
+
+  private fun canReadUri(activity: Activity, uri: Uri): Boolean {
+    return try {
+      activity.contentResolver.openFileDescriptor(uri, "r")?.use { }
+      true
+    } catch (_: FileNotFoundException) {
+      false
+    } catch (_: SecurityException) {
+      false
+    } catch (_: IllegalArgumentException) {
+      false
+    }
   }
 }

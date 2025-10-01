@@ -11,6 +11,7 @@ export default () => {
 
     // check if undefined
     if (scannedImages) {
+      console.log('scannedImages', scannedImages);
       // get back an array with scanned image file paths
       if (scannedImages.length > 0) {
         // set the img src, so we can view the first scanned image
