@@ -171,6 +171,23 @@ export default () => {
 * [Interfaces](#interfaces)
 * [Enums](#enums)
 
+### Response sanitization (since v0.2.2)
+
+The module now sanitizes results on both platforms, so you no longer need to post‑filter `scannedImages` in JS:
+
+- Android: for `responseType: 'base64'` only non‑empty base64 strings are returned; for URI responses the module verifies the URI is readable via `ContentResolver` and drops unreachable items.
+- iOS: trims strings, normalizes `file://` URLs to filesystem paths and checks file existence before returning.
+
+As a result `scannedImages` contains only valid items. Example:
+
+```ts
+const { status, scannedImages } = await DocumentScanner.scanDocument({ responseType: 'imageFilePath' })
+if (status === 'success' && scannedImages.length) {
+  // All items are valid URIs or base64 strings depending on responseType
+  setImage(scannedImages[0])
+}
+```
+
 ### scanDocument(...)
 
 ```typescript
@@ -195,7 +212,7 @@ Opens the camera, and starts the document scan
 
 | Prop                | Type                                                                              | Description                                                                                                                       |
 | ------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| **`scannedImages`** | <code>string[]</code>                                                             | This is an array with either file paths or base64 images for the document scan.                                                   |
+| **`scannedImages`** | <code>string[]</code>                                                             | Array of valid file URIs or base64 strings (already sanitized by the module).                                                     |
 | **`status`**        | <code><a href="#scandocumentresponsestatus">ScanDocumentResponseStatus</a></code> | The status lets you know if the document scan completes successfully, or if the user cancels before completing the document scan. |
 
 
@@ -313,4 +330,3 @@ This project builds on the excellent work by [WebsiteBeaver/react-native-documen
 ## License
 
 MIT
-
