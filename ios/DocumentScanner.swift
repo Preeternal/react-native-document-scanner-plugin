@@ -19,6 +19,7 @@ public class DocumentScannerImpl: NSObject {
       return
     }
 
+    // 1. Configuração das opções (Logica do Fork)
     let opts = options as? [String: Any] ?? [:]
     let responseType = opts["responseType"] as? String
     let quality = opts["croppedImageQuality"] as? Int
@@ -26,13 +27,27 @@ public class DocumentScannerImpl: NSObject {
 
     DispatchQueue.main.async {
       self.docScanner = DocScanner()
+      
+      // 2. Inicia o Scan
       self.docScanner?.startScan(
         RCTPresentedViewController(),
-        successHandler: { images in
+        
+        // 3. Handler de Sucesso MODIFICADO
+        // Agora recebe [[String: Any]] (Array de Objetos do seu Backup)
+        successHandler: { (scannedData: [[String: Any]]) in
+          
           let fm = FileManager.default
-          let sanitized: [String] = images.compactMap { raw -> String? in
-            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+          
+          // 4. Sanitização (Lógica do Fork adaptada para Objetos)
+          // Filtra os resultados para garantir que o arquivo realmente foi criado
+          let sanitized: [[String: Any]] = scannedData.compactMap { item -> [String: Any]? in
+            
+            // Tenta pegar a URI do objeto
+            guard let uri = item["uri"] as? String else { return nil }
+            let trimmed = uri.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
+            
+            // Se for arquivo (não base64), verifica se existe no disco (Segurança do Fork)
             if !isBase64Response {
               let path: String
               if let url = URL(string: trimmed), url.isFileURL {
@@ -41,21 +56,30 @@ public class DocumentScannerImpl: NSObject {
                 path = trimmed
               }
               if !fm.fileExists(atPath: path) {
-                return nil
+                return nil // Arquivo não encontrado, descarta
               }
             }
-            return trimmed
+            
+            // Se passou na validação, retorna o objeto COMPLETO (com barcode)
+            // Se precisar atualizar a URI "trimmada", recriamos o objeto
+            var validItem = item
+            validItem["uri"] = trimmed
+            return validItem
           }
+          
+          // 5. Retorna para o JS
           resolve([
             "status": "success",
-            "scannedImages": sanitized
+            "scannedImages": sanitized // Array de Objetos {uri, barcode, success}
           ])
           self.docScanner = nil
         },
+        
         errorHandler: { msg in
           reject("document_scan_error", msg, nil)
           self.docScanner = nil
         },
+        
         cancelHandler: {
           resolve([
             "status": "cancel",
@@ -63,6 +87,7 @@ public class DocumentScannerImpl: NSObject {
           ])
           self.docScanner = nil
         },
+        
         responseType: responseType,
         croppedImageQuality: quality
       )
