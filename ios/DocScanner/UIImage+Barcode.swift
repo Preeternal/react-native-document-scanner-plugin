@@ -2,9 +2,9 @@ import UIKit
 import Vision
 
 // MARK: - Constantes do Barcode (as mesmas do Kotlin)
-private let BARCODE_LARGURA_CORTE_PERCENTUAL: CGFloat = 20.0
-private let BARCODE_ALTURA_CORTE_PERCENTUAL: CGFloat = 16.0
-private let BARCODE_MARGEM_CANTO_PERCENTUAL: CGFloat = 2.0 / 100.0 // 2% em decimal
+private let BARCODE_LARGURA_CORTE_PERCENTUAL: CGFloat = 25.0
+private let BARCODE_ALTURA_CORTE_PERCENTUAL: CGFloat = 20.0
+private let BARCODE_MARGEM_CANTO_PERCENTUAL: CGFloat = 3.0 / 100.0 // 2% em decimal
 
 extension UIImage {
     
