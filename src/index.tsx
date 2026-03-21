@@ -1,6 +1,10 @@
 import DocumentScanner, {
   ResponseType,
   ScanDocumentResponseStatus,
+  type Barcode,
+  type BarcodeExtractionStatus,
+  type BarcodeFormat,
+  type ExtractBarcodesFromImagesOptions,
   type ScanDocumentOptions,
   type ScanDocumentResponse,
 } from './NativeDocumentScanner';
@@ -14,10 +18,28 @@ export function scanDocument(
   return DocumentScanner.scanDocument(options);
 }
 
+export function extractBarcodesFromImages(
+  images: string[],
+  options: ExtractBarcodesFromImagesOptions = {}
+): Promise<Barcode[]> {
+  return DocumentScanner.extractBarcodesFromImages({
+    images,
+    barcodeFormats: options.barcodeFormats,
+  });
+}
+
 export { ResponseType, ScanDocumentResponseStatus };
 
-export type { ScanDocumentOptions, ScanDocumentResponse };
+export type {
+  Barcode,
+  BarcodeExtractionStatus,
+  BarcodeFormat,
+  ExtractBarcodesFromImagesOptions,
+  ScanDocumentOptions,
+  ScanDocumentResponse,
+};
 
 export default {
+  extractBarcodesFromImages,
   scanDocument,
 };

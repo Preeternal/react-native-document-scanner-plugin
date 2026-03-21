@@ -5,6 +5,10 @@ import React
 @objc(DocumentScannerImpl)
 public class DocumentScannerImpl: NSObject {
   private var docScanner: DocScanner?
+  private let barcodeQueue = DispatchQueue(
+    label: "com.preeternal.document-scanner.barcode",
+    qos: .userInitiated
+  )
 
   @objc static func requiresMainQueueSetup() -> Bool { true }
 
@@ -19,35 +23,29 @@ public class DocumentScannerImpl: NSObject {
       return
     }
 
-    // 1. Configuração das opções (Logica do Fork)
     let opts = options as? [String: Any] ?? [:]
     let responseType = opts["responseType"] as? String
     let quality = opts["croppedImageQuality"] as? Int
     let isBase64Response = responseType?.lowercased() == "base64"
+    let shouldExtractBarcodes = opts["extractBarcodes"] as? Bool ?? false
+    let barcodeFormats = (opts["barcodeFormats"] as? [Any] ?? [])
+      .compactMap { $0 as? String }
 
     DispatchQueue.main.async {
       self.docScanner = DocScanner()
-      
-      // 2. Inicia o Scan
       self.docScanner?.startScan(
         RCTPresentedViewController(),
-        
-        // 3. Handler de Sucesso MODIFICADO
-        // Agora recebe [[String: Any]] (Array de Objetos do seu Backup)
         successHandler: { (scannedData: [[String: Any]]) in
-          
           let fm = FileManager.default
-          
-          // 4. Sanitização (Lógica do Fork adaptada para Objetos)
-          // Filtra os resultados para garantir que o arquivo realmente foi criado
-          let sanitized: [[String: Any]] = scannedData.compactMap { item -> [String: Any]? in
-            
-            // Tenta pegar a URI do objeto
-            guard let uri = item["uri"] as? String else { return nil }
-            let trimmed = uri.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return nil }
-            
-            // Se for arquivo (não base64), verifica se existe no disco (Segurança do Fork)
+          var sanitizedImages: [String] = []
+          var extractedBarcodes: [[String: Any]] = []
+
+          // Keep the same sanitization guarantees as the original API.
+          for item in scannedData {
+            guard let rawImage = item["image"] as? String else { continue }
+            let trimmed = rawImage.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+
             if !isBase64Response {
               let path: String
               if let url = URL(string: trimmed), url.isFileURL {
@@ -56,41 +54,147 @@ public class DocumentScannerImpl: NSObject {
                 path = trimmed
               }
               if !fm.fileExists(atPath: path) {
-                return nil // Arquivo não encontrado, descarta
+                continue
               }
             }
-            
-            // Se passou na validação, retorna o objeto COMPLETO (com barcode)
-            // Se precisar atualizar a URI "trimmada", recriamos o objeto
-            var validItem = item
-            validItem["uri"] = trimmed
-            return validItem
+
+            let sourceImageIndex = sanitizedImages.count
+            sanitizedImages.append(trimmed)
+
+            guard shouldExtractBarcodes && BarcodeFeatureFlags.isEnabled else {
+              continue
+            }
+
+            guard let pageBarcodes = item["barcodes"] as? [[String: Any]] else {
+              continue
+            }
+
+            // Flatten page-local barcodes into API-level barcodes with sourceImageIndex.
+            for barcode in pageBarcodes {
+              guard let value = barcode["value"] as? String,
+                    !value.isEmpty else {
+                continue
+              }
+
+              let format = (barcode["format"] as? String) ?? "unknown"
+              extractedBarcodes.append([
+                "value": value,
+                "format": format,
+                "sourceImageIndex": sourceImageIndex
+              ])
+            }
           }
-          
-          // 5. Retorna para o JS
-          resolve([
+
+          var payload: [String: Any] = [
             "status": "success",
-            "scannedImages": sanitized // Array de Objetos {uri, barcode, success}
-          ])
+            "scannedImages": sanitizedImages
+          ]
+
+          // Barcode payload is optional and only returned when explicitly requested.
+          if shouldExtractBarcodes {
+            if BarcodeFeatureFlags.isEnabled {
+              payload["barcodes"] = extractedBarcodes
+              payload["barcodeExtractionStatus"] = "success"
+            } else {
+              payload["barcodeExtractionStatus"] = "not_enabled"
+            }
+          }
+
+          resolve(payload)
           self.docScanner = nil
         },
-        
         errorHandler: { msg in
           reject("document_scan_error", msg, nil)
           self.docScanner = nil
         },
-        
         cancelHandler: {
-          resolve([
+          var payload: [String: Any] = [
             "status": "cancel",
             "scannedImages": []
-          ])
+          ]
+          if shouldExtractBarcodes && !BarcodeFeatureFlags.isEnabled {
+            payload["barcodeExtractionStatus"] = "not_enabled"
+          }
+          resolve(payload)
           self.docScanner = nil
         },
-        
         responseType: responseType,
-        croppedImageQuality: quality
+        croppedImageQuality: quality,
+        extractBarcodes: shouldExtractBarcodes,
+        barcodeFormats: barcodeFormats
       )
+    }
+  }
+
+  @objc(extractBarcodesFromImages:resolve:reject:)
+  public func extractBarcodesFromImages(
+    _ options: NSDictionary,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    guard #available(iOS 13.0, *) else {
+      reject("unsupported_ios", "iOS 13.0 or higher required", nil)
+      return
+    }
+
+    guard BarcodeFeatureFlags.isEnabled else {
+      reject(
+        "barcode_not_enabled",
+        "Barcode extraction feature is disabled. Enable DOCUMENT_SCANNER_ENABLE_BARCODE=1 before pod install.",
+        nil
+      )
+      return
+    }
+
+    let opts = options as? [String: Any] ?? [:]
+    let rawImages = opts["images"] as? [Any] ?? []
+    let allowedFormats = (opts["barcodeFormats"] as? [Any] ?? [])
+      .compactMap { $0 as? String }
+
+    if rawImages.isEmpty {
+      resolve([])
+      return
+    }
+
+    barcodeQueue.async {
+      #if DOCUMENT_SCANNER_ENABLE_BARCODE
+      var extractedBarcodes: [[String: Any]] = []
+
+      for (sourceImageIndex, source) in rawImages.enumerated() {
+        guard let imageSource = source as? String else {
+          continue
+        }
+
+        guard let image = BarcodeImageSource.loadImage(from: imageSource) else {
+          continue
+        }
+
+        let detected = BarcodeExtractor.extractFromImage(
+          image,
+          allowedFormats: allowedFormats
+        )
+
+        for barcode in detected where !barcode.value.isEmpty {
+          extractedBarcodes.append([
+            "value": barcode.value,
+            "format": barcode.format,
+            "sourceImageIndex": sourceImageIndex
+          ])
+        }
+      }
+
+      DispatchQueue.main.async {
+        resolve(extractedBarcodes)
+      }
+      #else
+      DispatchQueue.main.async {
+        reject(
+          "barcode_not_enabled",
+          "Barcode extraction feature is disabled. Enable DOCUMENT_SCANNER_ENABLE_BARCODE=1 before pod install.",
+          nil
+        )
+      }
+      #endif
     }
   }
 }

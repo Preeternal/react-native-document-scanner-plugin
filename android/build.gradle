@@ -25,6 +25,13 @@ def getExtOrIntegerDefault(name) {
   return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["DocumentScanner_" + name]).toInteger()
 }
 
+def barcodeFeatureEnabled =
+  (project.findProperty("enableBarcode")
+    ?: project.findProperty("DocumentScanner_enableBarcode")
+    ?: "false")
+    .toString()
+    .toBoolean()
+
 android {
   namespace "com.preeternal.scanner"
 
@@ -33,6 +40,7 @@ android {
   defaultConfig {
     minSdkVersion getExtOrIntegerDefault("minSdkVersion")
     targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
+    buildConfigField "boolean", "BARCODE_FEATURE_ENABLED", barcodeFeatureEnabled ? "true" : "false"
   }
 
   buildFeatures {
@@ -60,6 +68,11 @@ android {
         "generated/java",
         "generated/jni"
       ]
+      if (barcodeFeatureEnabled) {
+        java.srcDirs += ["src/barcode/java"]
+      } else {
+        java.srcDirs += ["src/no-barcode/java"]
+      }
     }
   }
 }
@@ -75,4 +88,9 @@ dependencies {
   implementation "com.facebook.react:react-android"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
   implementation "com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1"
+
+  if (barcodeFeatureEnabled) {
+    implementation "com.google.mlkit:barcode-scanning:17.3.0"
+    implementation "androidx.exifinterface:exifinterface:1.4.2"
+  }
 }
