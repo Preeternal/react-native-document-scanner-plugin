@@ -40,6 +40,20 @@ RCT_EXPORT_MODULE()
   [self.impl extractBarcodesFromImages:options resolve:resolve reject:reject];
 }
 
+- (void)handleTextExtractionWithOptions:(NSDictionary *)options
+                                resolve:(RCTPromiseResolveBlock)resolve
+                                 reject:(RCTPromiseRejectBlock)reject
+{
+  [self.impl extractTextFromImages:options resolve:resolve reject:reject];
+}
+
+- (void)handleAnalyzeWithOptions:(NSDictionary *)options
+                         resolve:(RCTPromiseResolveBlock)resolve
+                          reject:(RCTPromiseRejectBlock)reject
+{
+  [self.impl analyzeScannedImages:options resolve:resolve reject:reject];
+}
+
 - (void)invalidate
 {
   [self.impl invalidate];
@@ -96,6 +110,83 @@ RCT_EXPORT_MODULE()
   [self handleBarcodeExtractionWithOptions:dict resolve:resolve reject:reject];
 }
 
+- (void)extractTextFromImages:
+            (JS::NativeDocumentScanner::ExtractTextFromImagesRequest &)options
+                      resolve:(RCTPromiseResolveBlock)resolve
+                       reject:(RCTPromiseRejectBlock)reject
+{
+  NSMutableDictionary *dict = [NSMutableDictionary new];
+
+  auto images = options.images();
+  NSMutableArray<NSString *> *mappedImages = [NSMutableArray arrayWithCapacity:images.size()];
+  for (const auto &image : images) {
+    if (image != nil) {
+      [mappedImages addObject:image];
+    }
+  }
+  dict[@"images"] = mappedImages;
+
+  if (options.concurrency().has_value()) {
+    dict[@"concurrency"] = @(options.concurrency().value());
+  }
+  if (options.ocrRotate180Fallback().has_value()) {
+    dict[@"ocrRotate180Fallback"] = @(options.ocrRotate180Fallback().value());
+  }
+
+  [self handleTextExtractionWithOptions:dict resolve:resolve reject:reject];
+}
+
+- (void)analyzeScannedImages:
+            (JS::NativeDocumentScanner::AnalyzeScannedImagesRequest &)options
+                   resolve:(RCTPromiseResolveBlock)resolve
+                    reject:(RCTPromiseRejectBlock)reject
+{
+  NSMutableDictionary *dict = [NSMutableDictionary new];
+
+  auto images = options.images();
+  NSMutableArray<NSString *> *mappedImages = [NSMutableArray arrayWithCapacity:images.size()];
+  for (const auto &image : images) {
+    if (image != nil) {
+      [mappedImages addObject:image];
+    }
+  }
+  dict[@"images"] = mappedImages;
+
+  if (options.extractBarcodes().has_value()) {
+    dict[@"extractBarcodes"] = @(options.extractBarcodes().value());
+  }
+  if (options.extractText().has_value()) {
+    dict[@"extractText"] = @(options.extractText().value());
+  }
+  if (options.extractTables().has_value()) {
+    dict[@"extractTables"] = @(options.extractTables().value());
+  }
+  if (options.extractRegions().has_value()) {
+    dict[@"extractRegions"] = @(options.extractRegions().value());
+  }
+  if (options.extractStructuredData().has_value()) {
+    dict[@"extractStructuredData"] = @(options.extractStructuredData().value());
+  }
+  if (options.barcodeFormats().has_value()) {
+    auto formats = options.barcodeFormats().value();
+    NSMutableArray<NSString *> *mappedFormats = [NSMutableArray arrayWithCapacity:formats.size()];
+    for (const auto &format : formats) {
+      if (format != nil) {
+        [mappedFormats addObject:format];
+      }
+    }
+    dict[@"barcodeFormats"] = mappedFormats;
+  }
+  if (options.concurrency().has_value()) {
+    dict[@"concurrency"] = @(options.concurrency().value());
+  }
+  if (options.ocrRotate180Fallback().has_value()) {
+    dict[@"ocrRotate180Fallback"] = @(options.ocrRotate180Fallback().value());
+  }
+
+  [self handleAnalyzeWithOptions:dict resolve:resolve reject:reject];
+}
+
 - (std::shared_ptr<facebook::react::TurboModule>)getTurboModule:
     (const facebook::react::ObjCTurboModule::InitParams &)params
 {
@@ -114,6 +205,20 @@ RCT_EXPORT_METHOD(extractBarcodesFromImages:(NSDictionary *)options
                   reject:(RCTPromiseRejectBlock)reject)
 {
   [self handleBarcodeExtractionWithOptions:options resolve:resolve reject:reject];
+}
+
+RCT_EXPORT_METHOD(extractTextFromImages:(NSDictionary *)options
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+{
+  [self handleTextExtractionWithOptions:options resolve:resolve reject:reject];
+}
+
+RCT_EXPORT_METHOD(analyzeScannedImages:(NSDictionary *)options
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+{
+  [self handleAnalyzeWithOptions:options resolve:resolve reject:reject];
 }
 #endif
 @end

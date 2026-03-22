@@ -49,6 +49,9 @@ def analysisFeaturesRaw =
 
 def analysisFeatures = parseFeatureList(analysisFeaturesRaw)
 def barcodeFeatureEnabled = analysisFeatures.contains("barcode")
+def textFeatureEnabled = analysisFeatures.contains("text")
+def tablesFeatureEnabled = analysisFeatures.contains("tables")
+def textPipelineEnabled = textFeatureEnabled || tablesFeatureEnabled
 
 android {
   namespace "com.preeternal.scanner"
@@ -86,6 +89,11 @@ android {
       } else {
         java.srcDirs += ["src/no-barcode/java"]
       }
+      if (textPipelineEnabled) {
+        java.srcDirs += ["src/text/java"]
+      } else {
+        java.srcDirs += ["src/no-text/java"]
+      }
     }
   }
 }
@@ -105,5 +113,8 @@ dependencies {
   if (barcodeFeatureEnabled) {
     implementation "com.google.mlkit:barcode-scanning:17.3.0"
     implementation "androidx.exifinterface:exifinterface:1.4.2"
+  }
+  if (textPipelineEnabled) {
+    implementation "com.google.mlkit:text-recognition:16.0.1"
   }
 }

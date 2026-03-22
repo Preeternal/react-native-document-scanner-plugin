@@ -28,6 +28,7 @@ private let supportedNormalizedFormats: Set<String> = [
 struct ExtractedBarcode {
   let value: String
   let format: String
+  let instanceKey: String
 }
 
 enum BarcodeExtractor {
@@ -36,37 +37,84 @@ enum BarcodeExtractor {
     allowedFormats: [String] = []
   ) -> [ExtractedBarcode] {
     let normalizedAllowedFormats = normalizeAllowedFormats(allowedFormats)
-    let candidates = rotationCandidates(for: image)
+    var deduplicated = Set<String>()
+    var aggregated: [ExtractedBarcode] = []
 
-    for candidate in candidates {
-      let detected = detectInTopRightROI(candidate, allowedFormats: normalizedAllowedFormats)
-      if !detected.isEmpty {
-        return detected
+    let firstPass = detectInTopRightROI(
+      image,
+      allowedFormats: normalizedAllowedFormats,
+      attemptIndex: 0
+    )
+    appendUnique(
+      firstPass,
+      deduplicated: &deduplicated,
+      aggregated: &aggregated
+    )
+    if !aggregated.isEmpty {
+      return aggregated
+    }
+
+    if let rotated180 = image.rotated(by: .pi) {
+      let secondPass = detectInTopRightROI(
+        rotated180,
+        allowedFormats: normalizedAllowedFormats,
+        attemptIndex: 1
+      )
+      appendUnique(
+        secondPass,
+        deduplicated: &deduplicated,
+        aggregated: &aggregated
+      )
+      if !aggregated.isEmpty {
+        return aggregated
       }
     }
 
-    return []
+    if let rotated90 = image.rotated(by: .pi / 2) {
+      let thirdPass = detectInTopRightROI(
+        rotated90,
+        allowedFormats: normalizedAllowedFormats,
+        attemptIndex: 2
+      )
+      appendUnique(
+        thirdPass,
+        deduplicated: &deduplicated,
+        aggregated: &aggregated
+      )
+    }
+
+    if let rotatedMinus90 = image.rotated(by: -.pi / 2) {
+      let fourthPass = detectInTopRightROI(
+        rotatedMinus90,
+        allowedFormats: normalizedAllowedFormats,
+        attemptIndex: 3
+      )
+      appendUnique(
+        fourthPass,
+        deduplicated: &deduplicated,
+        aggregated: &aggregated
+      )
+    }
+
+    return aggregated
   }
 
-  private static func rotationCandidates(for image: UIImage) -> [UIImage] {
-    var candidates: [UIImage] = [image]
-
-    if let rotated90 = image.rotated(by: .pi / 2) {
-      candidates.append(rotated90)
+  private static func appendUnique(
+    _ detected: [ExtractedBarcode],
+    deduplicated: inout Set<String>,
+    aggregated: inout [ExtractedBarcode]
+  ) {
+    for barcode in detected {
+      if deduplicated.insert(barcode.instanceKey).inserted {
+        aggregated.append(barcode)
+      }
     }
-    if let rotatedMinus90 = image.rotated(by: -.pi / 2) {
-      candidates.append(rotatedMinus90)
-    }
-    if let rotated180 = image.rotated(by: .pi) {
-      candidates.append(rotated180)
-    }
-
-    return candidates
   }
 
   private static func detectInTopRightROI(
     _ image: UIImage,
-    allowedFormats: Set<String>
+    allowedFormats: Set<String>,
+    attemptIndex: Int
   ) -> [ExtractedBarcode] {
     guard let cgImage = image.cgImage else { return [] }
 
@@ -77,7 +125,7 @@ enum BarcodeExtractor {
 
     let request = VNDetectBarcodesRequest()
     if !allowedFormats.isEmpty {
-      let requestedSymbologies = request.supportedSymbologies.filter {
+      let requestedSymbologies = VNDetectBarcodesRequest.supportedSymbologies.filter {
         allowedFormats.contains(normalizeFormat($0))
       }
       if !requestedSymbologies.isEmpty {
@@ -111,13 +159,39 @@ enum BarcodeExtractor {
         continue
       }
 
-      let dedupKey = "\(normalizedFormat)|\(payload)"
+      let centerBucket = bucketKey(for: observation.boundingBox)
+      let dedupKey = "\(normalizedFormat)|\(payload)|a\(attemptIndex)|\(centerBucket)"
       if deduplicated.insert(dedupKey).inserted {
-        results.append(ExtractedBarcode(value: payload, format: normalizedFormat))
+        results.append(
+          ExtractedBarcode(
+            value: payload,
+            format: normalizedFormat,
+            instanceKey: dedupKey
+          )
+        )
       }
     }
 
     return results
+  }
+
+  private static func bucketKey(for rect: CGRect, bucketCount: Int = 24) -> String {
+    let centerX = min(max((rect.minX + rect.maxX) * 0.5, 0), 1)
+    let centerY = min(max((rect.minY + rect.maxY) * 0.5, 0), 1)
+
+    let xBucket = quantize(centerX, bucketCount: bucketCount)
+    let yBucket = quantize(centerY, bucketCount: bucketCount)
+    return "\(xBucket):\(yBucket)"
+  }
+
+  private static func quantize(_ value: CGFloat, bucketCount: Int) -> Int {
+    guard bucketCount > 1 else {
+      return 0
+    }
+
+    let clamped = min(max(value, 0), 1)
+    let scaled = Int(floor(clamped * CGFloat(bucketCount)))
+    return min(bucketCount - 1, max(0, scaled))
   }
 
   private static func roiRect(forWidth width: CGFloat, height: CGFloat) -> CGRect {

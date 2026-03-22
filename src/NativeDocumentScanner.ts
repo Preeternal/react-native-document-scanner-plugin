@@ -58,6 +58,35 @@ export interface ExtractBarcodesFromImagesRequest
 }
 
 /**
+ * Options for OCR extraction from existing images.
+ */
+export interface ExtractTextFromImagesOptions {
+  /**
+   * Maximum native worker concurrency. The implementation clamps this value to 1..2.
+   * @default 2
+   */
+  concurrency?: AnalysisConcurrency;
+
+  /**
+   * Enables an adaptive OCR fallback: run an additional 180° pass only when
+   * the first pass returns no or very little text.
+   * @default false
+   */
+  ocrRotate180Fallback?: boolean;
+}
+
+/**
+ * Native request shape for extractTextFromImages.
+ */
+export interface ExtractTextFromImagesRequest
+  extends ExtractTextFromImagesOptions {
+  /**
+   * Array of image sources. Each item can be a file path, file URI, or base64.
+   */
+  images: string[];
+}
+
+/**
  * Response type for scanned images.
  */
 export enum ResponseType {
@@ -115,21 +144,82 @@ export type Barcode = {
   sourceImageIndex: number;
 };
 
-/**
- * Placeholder shape for future OCR text blocks.
- */
-export type TextBlock = {
+export type NormalizedBoundingBox = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+export type TextLine = {
   text: string;
-  sourceImageIndex: number;
+  bbox?: NormalizedBoundingBox;
   confidence?: number;
 };
 
-/**
- * Placeholder shape for future extracted tables.
- */
+export type TextBlock = {
+  text: string;
+  sourceImageIndex: number;
+  bbox?: NormalizedBoundingBox;
+  confidence?: number;
+  lines?: TextLine[];
+};
+
+export type TableCell = {
+  text: string;
+  row: number;
+  column: number;
+  sourceImageIndex: number;
+  bbox?: NormalizedBoundingBox;
+};
+
 export type TableBlock = {
   rows: string[][];
   sourceImageIndex: number;
+  bbox?: NormalizedBoundingBox;
+  cells?: TableCell[];
+};
+
+export type RegionType =
+  | 'header'
+  | 'footer'
+  | 'paragraph'
+  | 'signature'
+  | 'stamp'
+  | 'unknown';
+
+export type Region = {
+  type: RegionType;
+  sourceImageIndex: number;
+  bbox: NormalizedBoundingBox;
+  score?: number;
+  text?: string;
+};
+
+export type StructuredEntityType =
+  | 'phone'
+  | 'email'
+  | 'date'
+  | 'amount'
+  | 'id'
+  | 'unknown';
+
+export type StructuredEntity = {
+  type: StructuredEntityType;
+  value: string;
+  sourceImageIndex: number;
+  bbox?: NormalizedBoundingBox;
+  confidence?: number;
+};
+
+export type StructuredField = {
+  key: string;
+  value: string;
+};
+
+export type StructuredData = {
+  entities?: StructuredEntity[];
+  fields?: StructuredField[];
 };
 
 /**
@@ -139,6 +229,7 @@ export type AnalyzeExtractOptions = {
   barcodes?: boolean;
   text?: boolean;
   tables?: boolean;
+  regions?: boolean;
   structuredData?: boolean;
 };
 
@@ -148,6 +239,27 @@ export type AnalyzeExtractOptions = {
 export interface AnalyzeScannedImagesOptions
   extends ExtractBarcodesFromImagesOptions {
   extract: AnalyzeExtractOptions;
+
+  /**
+   * Enables adaptive OCR fallback for text/semantics stages.
+   * @default true
+   */
+  ocrRotate180Fallback?: boolean;
+}
+
+/**
+ * Native request shape for analyzeScannedImages.
+ * Flattened to keep native codegen interop simple across architectures.
+ */
+export interface AnalyzeScannedImagesRequest
+  extends ExtractBarcodesFromImagesOptions {
+  images: string[];
+  extractBarcodes?: boolean;
+  extractText?: boolean;
+  extractTables?: boolean;
+  extractRegions?: boolean;
+  extractStructuredData?: boolean;
+  ocrRotate180Fallback?: boolean;
 }
 
 /**
@@ -166,8 +278,10 @@ export type AnalysisResult = {
   status: AnalysisResultStatus;
   barcodes?: Barcode[];
   text?: TextBlock[];
+  textBlocks?: TextBlock[];
   tables?: TableBlock[];
-  structuredData?: Record<string, unknown>;
+  regions?: Region[];
+  structuredData?: StructuredData;
 };
 
 type ScanDocumentSuccess = {
@@ -215,6 +329,24 @@ export interface Spec extends TurboModule {
   extractBarcodesFromImages(
     options: ExtractBarcodesFromImagesRequest
   ): Promise<Barcode[]>;
+
+  /**
+   * Extracts OCR text blocks from existing images without opening scanner UI.
+   * @param options Extraction request.
+   * @returns Promise with flattened text block list.
+   */
+  extractTextFromImages(
+    options: ExtractTextFromImagesRequest
+  ): Promise<TextBlock[]>;
+
+  /**
+   * Runs unified image analysis natively (barcode/OCR/tables/regions/structured data).
+   * @param options Flattened analysis request.
+   * @returns Promise with aggregate analysis result.
+   */
+  analyzeScannedImages(
+    options: AnalyzeScannedImagesRequest
+  ): Promise<AnalysisResult>;
 }
 
 const DocumentScanner =

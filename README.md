@@ -172,6 +172,7 @@ export default () => {
 * [Response sanitization (since v0.2.2)](#response-sanitization-since-v022)
 * [Barcode extraction (optional feature)](#barcode-extraction-optional-feature)
 * [`extractBarcodesFromImages(...)`](#extractbarcodesfromimages)
+* [`extractTextFromImages(...)`](#extracttextfromimages)
 * [`analyzeScannedImages(...)`](#analyzescannedimages)
 * [`scanAndAnalyzeDocument(...)`](#scanandanalyzedocument)
 * [Interfaces](#interfaces)
@@ -269,6 +270,32 @@ Extracts barcodes from existing images without opening scanner UI.
 
 --------------------
 
+### extractTextFromImages(...)
+
+```typescript
+extractTextFromImages(
+  images: string[],
+  options?: ExtractTextFromImagesOptions | undefined
+) => Promise<TextBlock[]>
+```
+
+Extracts OCR text blocks from existing images without opening scanner UI.
+
+| Param         | Type                                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------------ |
+| **`images`**  | <code>string[]</code>                                                                                  |
+| **`options`** | <code><a href="#extracttextfromimagesoptions">ExtractTextFromImagesOptions</a></code>                |
+
+**Returns:** <code>Promise&lt;<a href="#textblock">TextBlock</a>[]&gt;</code>
+
+Notes:
+
+- Android: requires `DocumentScanner_analysisFeatures` to include `text` or `tables`.
+- iOS: available by default (no additional build flag). On modern iOS versions the module uses `RecognizeDocumentsRequest`; older iOS versions fall back to classic OCR flow.
+- Optional (`false` by default for this method): set `ocrRotate180Fallback: true` to enable adaptive OCR fallback (extra 180° pass only when first pass returns very little text).
+
+--------------------
+
 ### analyzeScannedImages(...)
 
 ```typescript
@@ -279,7 +306,9 @@ analyzeScannedImages(
 ```
 
 Universal post-processing over scanned images.
-Right now barcode extraction is implemented; OCR/table/structured extractors are placeholders for future versions.
+Barcode extraction, OCR text, tables, regions, and structured data stages run natively.
+On iOS, `RecognizeDocumentsRequest` is used when available to read document structure (tables/text/data detector matches), with fallback to legacy OCR on older iOS versions.
+`ocrRotate180Fallback` is enabled by default for this method (`true`) and runs an extra OCR 180° pass only when first pass is weak.
 
 ```ts
 const analysis = await DocumentScanner.analyzeScannedImages(scannedImages, {
@@ -346,15 +375,23 @@ const result = await DocumentScanner.scanAndAnalyzeDocument({
 | **`barcodeFormats`** | <code><a href="#barcode">Barcode</a>['format'][]</code> | Optional allow-list of normalized barcode formats used during extraction. When omitted, all supported formats are scanned. | <code>: undefined</code> |
 | **`concurrency`**   | <code>1 \\| 2</code>                                | Maximum native worker concurrency for barcode extraction. Native implementations clamp values to <code>1..2</code>. | <code>: 2</code> |
 
+#### ExtractTextFromImagesOptions
+
+| Prop                | Type                | Description | Default |
+| ------------------- | ------------------- | ----------- | ------- |
+| **`concurrency`**   | <code>1 \\| 2</code> | Maximum native worker concurrency for OCR extraction. Native implementations clamp values to <code>1..2</code>. | <code>: 2</code> |
+| **`ocrRotate180Fallback`** | <code>boolean</code> | Adaptive OCR fallback: run an extra 180° pass only when first OCR pass returns too little text. | <code>: false</code> |
+
 
 #### AnalyzeExtractOptions
 
 | Prop                | Type               | Description |
 | ------------------- | ------------------ | ----------- |
 | **`barcodes`**      | <code>boolean</code> | Enable barcode extraction stage. |
-| **`text`**          | <code>boolean</code> | Reserved for future OCR extraction. |
-| **`tables`**        | <code>boolean</code> | Reserved for future table extraction. |
-| **`structuredData`**| <code>boolean</code> | Reserved for future structured document extraction. |
+| **`text`**          | <code>boolean</code> | Enable OCR text extraction stage. |
+| **`tables`**        | <code>boolean</code> | Enable table inference from OCR lines. |
+| **`regions`**       | <code>boolean</code> | Enable zone/region inference from OCR blocks. |
+| **`structuredData`**| <code>boolean</code> | Enable entity and key-value inference from OCR output. |
 
 
 #### AnalyzeScannedImagesOptions
@@ -363,7 +400,8 @@ const result = await DocumentScanner.scanAndAnalyzeDocument({
 | ------------------- | -------------------------------------------------------------- | ----------- |
 | **`extract`**       | <code><a href="#analyzeextractoptions">AnalyzeExtractOptions</a></code> | Extractor toggles for image analysis. |
 | **`barcodeFormats`**| <code><a href="#barcode">Barcode</a>['format'][]</code>       | Optional barcode format allow-list for barcode stage. |
-| **`concurrency`**   | <code>1 \\| 2</code>                                           | Optional native worker concurrency for barcode stage. |
+| **`concurrency`**   | <code>1 \\| 2</code>                                           | Optional native worker concurrency for barcode/OCR stages. |
+| **`ocrRotate180Fallback`** | <code>boolean</code>                                    | Enables adaptive OCR fallback for text/semantics stages. Default: <code>true</code>. |
 
 
 #### AnalysisResult
@@ -372,9 +410,11 @@ const result = await DocumentScanner.scanAndAnalyzeDocument({
 | ------------------- | ------------------------------------------------------------------------------------- | ----------- |
 | **`status`**        | <code>'success' \\| 'partial' \\| 'failed' \\| 'not_enabled'</code>                  | Aggregate status of requested analysis stages. |
 | **`barcodes`**      | <code><a href="#barcode">Barcode</a>[]</code>                                        | Extracted barcodes when requested and available. |
-| **`text`**          | <code>{ text: string; sourceImageIndex: number; confidence?: number }[]</code>      | Reserved placeholder for OCR blocks. |
-| **`tables`**        | <code>{ rows: string[][]; sourceImageIndex: number }[]</code>                        | Reserved placeholder for table extraction. |
-| **`structuredData`**| <code>Record&lt;string, unknown&gt;</code>                                           | Reserved placeholder for structured extraction. |
+| **`textBlocks`**    | <code><a href="#textblock">TextBlock</a>[]</code>                                    | OCR text blocks (new canonical field). |
+| **`text`**          | <code><a href="#textblock">TextBlock</a>[]</code>                                    | Backward-compatible alias for `textBlocks`. |
+| **`tables`**        | <code><a href="#tableblock">TableBlock</a>[]</code>                                  | Inferred tables from OCR lines. |
+| **`regions`**       | <code><a href="#region">Region</a>[]</code>                                          | Inferred document zones (header/footer/paragraph/etc). |
+| **`structuredData`**| <code><a href="#structureddata">StructuredData</a></code>                            | Inferred entities and key-value fields from OCR output. |
 
 
 #### ScanAndAnalyzeDocumentOptions
@@ -403,6 +443,39 @@ const result = await DocumentScanner.scanAndAnalyzeDocument({
 | **`value`**         | <code>string</code>                                                                        | Decoded barcode payload.                                                                      |
 | **`format`**        | <code>'aztec' \\| 'codabar' \\| 'code39' \\| 'code93' \\| 'code128' \\| 'dataMatrix' \\| 'ean8' \\| 'ean13' \\| 'itf' \\| 'pdf417' \\| 'qr' \\| 'upca' \\| 'upce' \\| 'unknown'</code> | Normalized barcode format. |
 | **`sourceImageIndex`** | <code>number</code>                                                                     | Index of the source image in `scannedImages` that produced this barcode.                     |
+
+#### TextBlock
+
+| Prop                | Type                                                                                      | Description |
+| ------------------- | ----------------------------------------------------------------------------------------- | ----------- |
+| **`text`**          | <code>string</code>                                                                       | OCR text content for the block. |
+| **`sourceImageIndex`** | <code>number</code>                                                                    | Source image index in `scannedImages`. |
+| **`bbox`**          | <code>{ left: number; top: number; width: number; height: number }</code>               | Optional normalized bounding box (`0..1`). |
+| **`lines`**         | <code>{ text: string; bbox?: { left: number; top: number; width: number; height: number } }[]</code> | OCR lines inside the block when available. |
+
+#### TableBlock
+
+| Prop                | Type                                                                                      | Description |
+| ------------------- | ----------------------------------------------------------------------------------------- | ----------- |
+| **`sourceImageIndex`** | <code>number</code>                                                                    | Source image index in `scannedImages`. |
+| **`rows`**          | <code>string[][]</code>                                                                   | Inferred table rows and cell texts. |
+| **`bbox`**          | <code>{ left: number; top: number; width: number; height: number }</code>               | Optional normalized table bounds. |
+
+#### Region
+
+| Prop                | Type                                                                                      | Description |
+| ------------------- | ----------------------------------------------------------------------------------------- | ----------- |
+| **`type`**          | <code>'header' \\| 'footer' \\| 'paragraph' \\| 'signature' \\| 'stamp' \\| 'unknown'</code> | Inferred region category. |
+| **`sourceImageIndex`** | <code>number</code>                                                                    | Source image index in `scannedImages`. |
+| **`bbox`**          | <code>{ left: number; top: number; width: number; height: number }</code>               | Normalized region bounds (`0..1`). |
+| **`score`**         | <code>number</code>                                                                       | Optional heuristic confidence score. |
+
+#### StructuredData
+
+| Prop                | Type                                                                                      | Description |
+| ------------------- | ----------------------------------------------------------------------------------------- | ----------- |
+| **`entities`**      | <code>{ type: 'phone' \\| 'email' \\| 'date' \\| 'amount' \\| 'id' \\| 'unknown'; value: string; sourceImageIndex: number }[]</code> | Inferred typed entities. |
+| **`fields`**        | <code>{ key: string; value: string }[]</code>                                            | Inferred key-value fields from OCR lines. |
 
 
 ### Enums

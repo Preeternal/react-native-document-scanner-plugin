@@ -3,11 +3,13 @@ package com.preeternal.scanner.barcode
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.graphics.Rect
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import kotlin.math.floor
 import kotlin.math.roundToInt
 
 class BarcodeExtractorImpl : BarcodeExtractor {
@@ -15,6 +17,7 @@ class BarcodeExtractorImpl : BarcodeExtractor {
     private const val CROP_WIDTH_PERCENT = 25.0f
     private const val CROP_HEIGHT_PERCENT = 20.0f
     private const val CORNER_MARGIN_PERCENT = 3.0f
+    private const val CENTER_BUCKETS = 24
 
     private val formatToMlKit = mapOf(
       BarcodeFormats.AZTEC to Barcode.FORMAT_AZTEC,
@@ -34,6 +37,11 @@ class BarcodeExtractorImpl : BarcodeExtractor {
   }
 
   private val scannerCache = mutableMapOf<String, BarcodeScanner>()
+
+  private data class BarcodeCandidate(
+    val dedupKey: String,
+    val result: BarcodeResult
+  )
 
   override fun isFeatureEnabled(): Boolean = true
 
@@ -57,6 +65,7 @@ class BarcodeExtractorImpl : BarcodeExtractor {
       sourceImageIndex = sourceImageIndex,
       allowedFormats = normalizedAllowList,
       attemptIndex = 0,
+      collected = LinkedHashMap(),
       callback = callback
     )
   }
@@ -67,18 +76,24 @@ class BarcodeExtractorImpl : BarcodeExtractor {
     sourceImageIndex: Int,
     allowedFormats: Set<String>,
     attemptIndex: Int,
+    collected: LinkedHashMap<String, BarcodeResult>,
     callback: (List<BarcodeResult>) -> Unit
   ) {
     if (attemptIndex >= 4) {
-      callback(emptyList())
+      callback(collected.values.toList())
+      return
+    }
+
+    if (attemptIndex > 0 && collected.isNotEmpty()) {
+      callback(collected.values.toList())
       return
     }
 
     val angle = when (attemptIndex) {
       0 -> 0f
-      1 -> 90f
-      2 -> -90f
-      else -> 180f
+      1 -> 180f
+      2 -> 90f
+      else -> -90f
     }
 
     val candidate = if (angle == 0f) {
@@ -88,37 +103,81 @@ class BarcodeExtractorImpl : BarcodeExtractor {
     }
 
     if (candidate == null) {
-      processAttempt(scanner, sourceBitmap, sourceImageIndex, allowedFormats, attemptIndex + 1, callback)
+      processAttempt(
+        scanner,
+        sourceBitmap,
+        sourceImageIndex,
+        allowedFormats,
+        attemptIndex + 1,
+        collected,
+        callback
+      )
       return
     }
 
     val roiBitmap = cropTopRightRoi(candidate)
     if (roiBitmap == null) {
-      processAttempt(scanner, sourceBitmap, sourceImageIndex, allowedFormats, attemptIndex + 1, callback)
+      processAttempt(
+        scanner,
+        sourceBitmap,
+        sourceImageIndex,
+        allowedFormats,
+        attemptIndex + 1,
+        collected,
+        callback
+      )
       return
     }
 
     val input = InputImage.fromBitmap(roiBitmap, 0)
     scanner.process(input)
       .addOnSuccessListener { barcodes ->
-        val mapped = barcodesToResults(barcodes, sourceImageIndex, allowedFormats)
-        if (mapped.isNotEmpty()) {
-          callback(mapped)
-        } else {
-          processAttempt(scanner, sourceBitmap, sourceImageIndex, allowedFormats, attemptIndex + 1, callback)
+        val mapped = barcodesToCandidates(
+          barcodes = barcodes,
+          sourceImageIndex = sourceImageIndex,
+          allowedFormats = allowedFormats,
+          attemptIndex = attemptIndex,
+          roiWidth = roiBitmap.width,
+          roiHeight = roiBitmap.height
+        )
+        for (candidateResult in mapped) {
+          if (!collected.containsKey(candidateResult.dedupKey)) {
+            collected[candidateResult.dedupKey] = candidateResult.result
+          }
         }
+
+        processAttempt(
+          scanner,
+          sourceBitmap,
+          sourceImageIndex,
+          allowedFormats,
+          attemptIndex + 1,
+          collected,
+          callback
+        )
       }
       .addOnFailureListener {
-        processAttempt(scanner, sourceBitmap, sourceImageIndex, allowedFormats, attemptIndex + 1, callback)
+        processAttempt(
+          scanner,
+          sourceBitmap,
+          sourceImageIndex,
+          allowedFormats,
+          attemptIndex + 1,
+          collected,
+          callback
+        )
       }
   }
 
-  private fun barcodesToResults(
+  private fun barcodesToCandidates(
     barcodes: List<Barcode>,
     sourceImageIndex: Int,
-    allowedFormats: Set<String>
-  ): List<BarcodeResult> {
-    val dedup = LinkedHashMap<String, BarcodeResult>()
+    allowedFormats: Set<String>,
+    attemptIndex: Int,
+    roiWidth: Int,
+    roiHeight: Int
+  ): List<BarcodeCandidate> {
+    val dedup = LinkedHashMap<String, BarcodeCandidate>()
 
     for (barcode in barcodes) {
       val value = barcode.rawValue?.trim()
@@ -131,17 +190,68 @@ class BarcodeExtractorImpl : BarcodeExtractor {
         continue
       }
 
-      val key = "$format|$value"
-      if (!dedup.containsKey(key)) {
-        dedup[key] = BarcodeResult(
-          value = value,
-          format = format,
-          sourceImageIndex = sourceImageIndex
+      val instanceKey = buildInstanceKey(
+        format = format,
+        value = value,
+        attemptIndex = attemptIndex,
+        boundingBox = barcode.boundingBox,
+        roiWidth = roiWidth,
+        roiHeight = roiHeight
+      )
+      if (!dedup.containsKey(instanceKey)) {
+        dedup[instanceKey] = BarcodeCandidate(
+          dedupKey = instanceKey,
+          result = BarcodeResult(
+            value = value,
+            format = format,
+            sourceImageIndex = sourceImageIndex
+          )
         )
       }
     }
 
     return dedup.values.toList()
+  }
+
+  private fun buildInstanceKey(
+    format: String,
+    value: String,
+    attemptIndex: Int,
+    boundingBox: Rect?,
+    roiWidth: Int,
+    roiHeight: Int
+  ): String {
+    val bucket = centerBucketKey(boundingBox, roiWidth, roiHeight)
+    return "$format|$value|a$attemptIndex|$bucket"
+  }
+
+  private fun centerBucketKey(
+    boundingBox: Rect?,
+    imageWidth: Int,
+    imageHeight: Int
+  ): String {
+    if (boundingBox == null || imageWidth <= 0 || imageHeight <= 0) {
+      return "u"
+    }
+
+    val centerX = (((boundingBox.left + boundingBox.right) * 0.5f) / imageWidth.toFloat())
+      .coerceIn(0f, 1f)
+    val centerY = (((boundingBox.top + boundingBox.bottom) * 0.5f) / imageHeight.toFloat())
+      .coerceIn(0f, 1f)
+
+    val xBucket = quantize(centerX)
+    val yBucket = quantize(centerY)
+    return "$xBucket:$yBucket"
+  }
+
+  private fun quantize(value: Float): Int {
+    if (CENTER_BUCKETS <= 1) {
+      return 0
+    }
+
+    val clamped = value.coerceIn(0f, 1f)
+    val scaled = floor((clamped * CENTER_BUCKETS.toFloat()).toDouble()).toInt()
+    return scaled.coerceIn(0, CENTER_BUCKETS - 1)
   }
 
   private fun normalizeFormat(format: Int): String {
