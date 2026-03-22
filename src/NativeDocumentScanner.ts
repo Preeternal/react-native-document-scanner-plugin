@@ -22,19 +22,12 @@ export interface ScanDocumentOptions {
    * @default ResponseType.ImageFilePath
    */
   responseType?: ResponseType;
-
-  /**
-   * When enabled, the module extracts barcodes from captured images as post-processing.
-   * @default false
-   */
-  extractBarcodes?: boolean;
-
-  /**
-   * Optional allow-list of normalized barcode formats for extraction.
-   * Effective only when barcode extraction is requested.
-   */
-  barcodeFormats?: BarcodeFormat[];
 }
+
+/**
+ * Supported worker concurrency for image analysis.
+ */
+export type AnalysisConcurrency = 1 | 2;
 
 /**
  * Options for barcode extraction from existing images.
@@ -45,6 +38,12 @@ export interface ExtractBarcodesFromImagesOptions {
    * When omitted, all supported formats are scanned.
    */
   barcodeFormats?: BarcodeFormat[];
+
+  /**
+   * Maximum native worker concurrency. The implementation clamps this value to 1..2.
+   * @default 2
+   */
+  concurrency?: AnalysisConcurrency;
 }
 
 /**
@@ -117,25 +116,85 @@ export type Barcode = {
 };
 
 /**
- * Status for optional barcode extraction.
+ * Placeholder shape for future OCR text blocks.
  */
-export type BarcodeExtractionStatus = 'success' | 'not_enabled' | 'failed';
+export type TextBlock = {
+  text: string;
+  sourceImageIndex: number;
+  confidence?: number;
+};
+
+/**
+ * Placeholder shape for future extracted tables.
+ */
+export type TableBlock = {
+  rows: string[][];
+  sourceImageIndex: number;
+};
+
+/**
+ * Extractor toggles for universal post-processing.
+ */
+export type AnalyzeExtractOptions = {
+  barcodes?: boolean;
+  text?: boolean;
+  tables?: boolean;
+  structuredData?: boolean;
+};
+
+/**
+ * Options for universal post-processing across scanned images.
+ */
+export interface AnalyzeScannedImagesOptions
+  extends ExtractBarcodesFromImagesOptions {
+  extract: AnalyzeExtractOptions;
+}
+
+/**
+ * Status returned by universal post-processing.
+ */
+export type AnalysisResultStatus =
+  | 'success'
+  | 'partial'
+  | 'failed'
+  | 'not_enabled';
+
+/**
+ * Universal post-processing response.
+ */
+export type AnalysisResult = {
+  status: AnalysisResultStatus;
+  barcodes?: Barcode[];
+  text?: TextBlock[];
+  tables?: TableBlock[];
+  structuredData?: Record<string, unknown>;
+};
 
 type ScanDocumentSuccess = {
   status: ScanDocumentResponseStatus.Success;
   scannedImages: string[];
-  barcodes?: Barcode[];
-  barcodeExtractionStatus?: BarcodeExtractionStatus;
 };
 
 type ScanDocumentCancel = {
   status: ScanDocumentResponseStatus.Cancel;
   scannedImages: [];
-  barcodes?: Barcode[];
-  barcodeExtractionStatus?: BarcodeExtractionStatus;
 };
 
 export type ScanDocumentResponse = ScanDocumentSuccess | ScanDocumentCancel;
+
+/**
+ * Convenience options for one-shot scan + analysis.
+ */
+export interface ScanAndAnalyzeDocumentOptions extends ScanDocumentOptions {
+  analysis: AnalyzeScannedImagesOptions;
+}
+
+/**
+ * Convenience response for one-shot scan + analysis.
+ */
+export type ScanAndAnalyzeDocumentResponse = ScanDocumentResponse & {
+  analysis: AnalysisResult;
+};
 
 /**
  * TurboModule spec.

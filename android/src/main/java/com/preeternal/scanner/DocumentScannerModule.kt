@@ -29,6 +29,10 @@ import com.preeternal.scanner.barcode.BarcodeResult
 import java.io.ByteArrayOutputStream
 import java.io.FileNotFoundException
 import java.lang.ref.WeakReference
+import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @ReactModule(name = DocumentScannerModule.NAME)
 class DocumentScannerModule(reactContext: ReactApplicationContext) :
@@ -47,8 +51,6 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
   private var pendingPromise: Promise? = null
   private var pendingOptions: ReadableMap? = null
   private var pendingQuality: Int = 100
-  private var pendingExtractBarcodes: Boolean = false
-  private var pendingBarcodeFormats: Set<String> = emptySet()
   private var scanner: GmsDocumentScanner? = null
 
   private var hostActivityRef: WeakReference<ComponentActivity>? = null
@@ -72,11 +74,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
 
     pendingPromise = promise
     pendingOptions = options
-    // Keep original image-quality behavior for base64 responses.
     pendingQuality = if (options.hasKey("croppedImageQuality")) options.getInt("croppedImageQuality") else 100
-    // Barcode extraction is opt-in and post-processing only.
-    pendingExtractBarcodes = options.hasKey("extractBarcodes") && options.getBoolean("extractBarcodes")
-    pendingBarcodeFormats = parseAllowedFormats(getArrayOrNull(options, "barcodeFormats"))
 
     hostActivityRef = WeakReference(componentActivity)
     ensureSystemBarsVisible(componentActivity)
@@ -102,17 +100,16 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     }
 
     val allowedFormats = parseAllowedFormats(getArrayOrNull(options, "barcodeFormats"))
-    val barcodes = WritableNativeArray()
+    val requestedConcurrency = getIntOrNull(options, "concurrency") ?: 2
+    val concurrency = requestedConcurrency.coerceIn(1, 2)
 
-    processInputImages(
+    extractBarcodesInParallel(
       context = reactApplicationContext,
       images = images,
-      imageIndex = 0,
       allowedFormats = allowedFormats,
-      barcodes = barcodes
-    ) {
-      promise.resolve(barcodes)
-    }
+      concurrency = concurrency,
+      promise = promise
+    )
   }
 
   private fun initScanner(options: ReadableMap) {
@@ -136,27 +133,18 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
       val options = pendingOptions
       val response = WritableNativeMap()
       val images = WritableNativeArray()
-      val barcodes = WritableNativeArray()
-      val shouldExtractBarcodes = pendingExtractBarcodes
-      val requestedBarcodeFormats = pendingBarcodeFormats
-      // Feature can be requested at runtime but still disabled at build time.
-      val canExtractBarcodes = shouldExtractBarcodes && barcodeExtractor.isFeatureEnabled()
 
       if (result.resultCode == Activity.RESULT_OK) {
         val docResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
         val pages = docResult?.pages.orEmpty()
         val responseType = options?.getString("responseType")?.lowercase()
 
-        // Process pages sequentially to keep deterministic sourceImageIndex mapping.
         processPages(
           activity = activity,
           pages = pages,
           pageIndex = 0,
           responseType = responseType,
           images = images,
-          shouldExtractBarcodes = canExtractBarcodes,
-          allowedFormats = requestedBarcodeFormats,
-          barcodes = barcodes,
           onError = { errorMessage ->
             promise.reject("document_scan_error", errorMessage, null)
             clearPending()
@@ -164,14 +152,6 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
           onComplete = {
             response.putString("status", "success")
             response.putArray("scannedImages", images)
-            if (shouldExtractBarcodes) {
-              if (canExtractBarcodes) {
-                response.putArray("barcodes", barcodes)
-                response.putString("barcodeExtractionStatus", "success")
-              } else {
-                response.putString("barcodeExtractionStatus", "not_enabled")
-              }
-            }
             promise.resolve(response)
             clearPending()
           }
@@ -179,9 +159,6 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
       } else {
         response.putString("status", "cancel")
         response.putArray("scannedImages", images)
-        if (shouldExtractBarcodes && !canExtractBarcodes) {
-          response.putString("barcodeExtractionStatus", "not_enabled")
-        }
         promise.resolve(response)
         clearPending()
       }
@@ -194,9 +171,6 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     pageIndex: Int,
     responseType: String?,
     images: WritableNativeArray,
-    shouldExtractBarcodes: Boolean,
-    allowedFormats: Set<String>,
-    barcodes: WritableNativeArray,
     onError: (String) -> Unit,
     onComplete: () -> Unit
   ) {
@@ -221,59 +195,22 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
         pageIndex = pageIndex + 1,
         responseType = responseType,
         images = images,
-        shouldExtractBarcodes = shouldExtractBarcodes,
-        allowedFormats = allowedFormats,
-        barcodes = barcodes,
         onError = onError,
         onComplete = onComplete
       )
       return
     }
 
-    val sourceImageIndex = images.size()
     images.pushString(outputImage)
-
-    // Preserve original behavior when barcode extraction is not requested.
-    if (!shouldExtractBarcodes) {
-      processPages(
-        activity = activity,
-        pages = pages,
-        pageIndex = pageIndex + 1,
-        responseType = responseType,
-        images = images,
-        shouldExtractBarcodes = false,
-        allowedFormats = allowedFormats,
-        barcodes = barcodes,
-        onError = onError,
-        onComplete = onComplete
-      )
-      return
-    }
-
-    barcodeExtractor.extractFromSource(
-      context = activity,
-      imageSource = uri.toString(),
-      sourceImageIndex = sourceImageIndex,
-      allowedFormats = allowedFormats
-    ) { detected ->
-      // Emit normalized barcode payloads with image index linkage.
-      for (barcode in detected) {
-        barcodes.pushMap(toWritableBarcode(barcode))
-      }
-
-      processPages(
-        activity = activity,
-        pages = pages,
-        pageIndex = pageIndex + 1,
-        responseType = responseType,
-        images = images,
-        shouldExtractBarcodes = true,
-        allowedFormats = allowedFormats,
-        barcodes = barcodes,
-        onError = onError,
-        onComplete = onComplete
-      )
-    }
+    processPages(
+      activity = activity,
+      pages = pages,
+      pageIndex = pageIndex + 1,
+      responseType = responseType,
+      images = images,
+      onError = onError,
+      onComplete = onComplete
+    )
   }
 
   private fun mapOutputImage(
@@ -298,51 +235,114 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     return map
   }
 
-  private fun processInputImages(
+  private data class IndexedImageSource(
+    val sourceImageIndex: Int,
+    val imageSource: String
+  )
+
+  private fun extractBarcodesInParallel(
     context: ReactApplicationContext,
     images: ReadableArray,
-    imageIndex: Int,
     allowedFormats: Set<String>,
-    barcodes: WritableNativeArray,
-    onComplete: () -> Unit
+    concurrency: Int,
+    promise: Promise
   ) {
-    if (imageIndex >= images.size()) {
-      onComplete()
+    val validSources = mutableListOf<IndexedImageSource>()
+    for (index in 0 until images.size()) {
+      val imageSource = readStringAt(images, index)
+      if (!imageSource.isNullOrBlank()) {
+        validSources.add(
+          IndexedImageSource(
+            sourceImageIndex = index,
+            imageSource = imageSource
+          )
+        )
+      }
+    }
+
+    if (validSources.isEmpty()) {
+      promise.resolve(WritableNativeArray())
       return
     }
 
-    val imageSource = readStringAt(images, imageIndex)
-    if (imageSource.isNullOrBlank()) {
-      processInputImages(
-        context = context,
-        images = images,
-        imageIndex = imageIndex + 1,
-        allowedFormats = allowedFormats,
-        barcodes = barcodes,
-        onComplete = onComplete
-      )
-      return
+    val workerPool = Executors.newFixedThreadPool(concurrency)
+    val completionLatch = CountDownLatch(validSources.size)
+    val collected = Collections.synchronizedList(mutableListOf<BarcodeResult>())
+
+    for (entry in validSources) {
+      workerPool.execute {
+        try {
+          val detected = extractBarcodesForSource(
+            context = context,
+            imageSource = entry.imageSource,
+            sourceImageIndex = entry.sourceImageIndex,
+            allowedFormats = allowedFormats
+          )
+          if (detected.isNotEmpty()) {
+            collected.addAll(detected)
+          }
+        } finally {
+          completionLatch.countDown()
+        }
+      }
     }
+
+    Thread {
+      try {
+        completionLatch.await()
+
+        val sorted = collected.sortedWith(
+          compareBy<BarcodeResult>({ it.sourceImageIndex }, { it.value }, { it.format })
+        )
+        val payload = WritableNativeArray()
+        for (barcode in sorted) {
+          payload.pushMap(toWritableBarcode(barcode))
+        }
+
+        reactApplicationContext.runOnUiQueueThread {
+          promise.resolve(payload)
+        }
+      } catch (e: InterruptedException) {
+        Thread.currentThread().interrupt()
+        reactApplicationContext.runOnUiQueueThread {
+          promise.reject("barcode_extraction_error", "Barcode extraction interrupted", e)
+        }
+      } catch (e: Exception) {
+        reactApplicationContext.runOnUiQueueThread {
+          promise.reject("barcode_extraction_error", e.message, e)
+        }
+      } finally {
+        workerPool.shutdown()
+      }
+    }.start()
+  }
+
+  private fun extractBarcodesForSource(
+    context: ReactApplicationContext,
+    imageSource: String,
+    sourceImageIndex: Int,
+    allowedFormats: Set<String>
+  ): List<BarcodeResult> {
+    var detectedResults: List<BarcodeResult> = emptyList()
+    val extractionLatch = CountDownLatch(1)
 
     barcodeExtractor.extractFromSource(
       context = context,
       imageSource = imageSource,
-      sourceImageIndex = imageIndex,
+      sourceImageIndex = sourceImageIndex,
       allowedFormats = allowedFormats
     ) { detected ->
-      for (barcode in detected) {
-        barcodes.pushMap(toWritableBarcode(barcode))
-      }
-
-      processInputImages(
-        context = context,
-        images = images,
-        imageIndex = imageIndex + 1,
-        allowedFormats = allowedFormats,
-        barcodes = barcodes,
-        onComplete = onComplete
-      )
+      detectedResults = detected
+      extractionLatch.countDown()
     }
+
+    try {
+      extractionLatch.await(20, TimeUnit.SECONDS)
+    } catch (_: InterruptedException) {
+      Thread.currentThread().interrupt()
+    }
+
+    return detectedResults
   }
 
   private fun parseAllowedFormats(rawFormats: ReadableArray?): Set<String> {
@@ -375,6 +375,18 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
         null
       } else {
         map.getArray(key)
+      }
+    } catch (_: Exception) {
+      null
+    }
+  }
+
+  private fun getIntOrNull(map: ReadableMap, key: String): Int? {
+    return try {
+      if (!map.hasKey(key) || map.isNull(key)) {
+        null
+      } else {
+        map.getInt(key)
       }
     } catch (_: Exception) {
       null
@@ -418,8 +430,6 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     pendingPromise = null
     pendingOptions = null
     pendingQuality = 100
-    pendingExtractBarcodes = false
-    pendingBarcodeFormats = emptySet()
     restoreSystemBars()
   }
 

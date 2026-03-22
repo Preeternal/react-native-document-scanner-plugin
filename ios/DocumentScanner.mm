@@ -55,19 +55,6 @@ RCT_EXPORT_MODULE()
   if (options.maxNumDocuments().has_value()) {
     dict[@"maxNumDocuments"] = @(options.maxNumDocuments().value());
   }
-  if (options.extractBarcodes().has_value()) {
-    dict[@"extractBarcodes"] = @(options.extractBarcodes().value());
-  }
-  if (options.barcodeFormats().has_value()) {
-    auto formats = options.barcodeFormats().value();
-    NSMutableArray<NSString *> *mappedFormats = [NSMutableArray arrayWithCapacity:formats.size()];
-    for (const auto &format : formats) {
-      if (format != nil) {
-        [mappedFormats addObject:format];
-      }
-    }
-    dict[@"barcodeFormats"] = mappedFormats;
-  }
   [self handleScanWithOptions:dict resolve:resolve reject:reject];
 }
 
@@ -96,6 +83,9 @@ RCT_EXPORT_MODULE()
       }
     }
     dict[@"barcodeFormats"] = mappedFormats;
+  }
+  if (options.concurrency().has_value()) {
+    dict[@"concurrency"] = @(options.concurrency().value());
   }
 
   [self handleBarcodeExtractionWithOptions:dict resolve:resolve reject:reject];

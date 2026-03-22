@@ -13,7 +13,7 @@ Fork of [react-native-document-scanner-plugin](https://github.com/WebsiteBeaver/
 ## Which package should I use?
 
 - **Use the upstream package** (`react-native-document-scanner-plugin`) if you want to stay on the original repository now that it also supports New Architecture.
-- **Use this fork** (`@preeternal/react-native-document-scanner-plugin`) if you want quicker iteration on fixes, Expo/EAS build hardening, and a maintained release cadence. The public API is identical.
+- **Use this fork** (`@preeternal/react-native-document-scanner-plugin`) if you want quicker iteration on fixes, Expo/EAS build hardening, and a maintained release cadence. The core `scanDocument(...)` API remains backward compatible.
 
 > **Attribution**: This package is a community‑maintained fork of the original project by **WebsiteBeaver**. Demo videos embedded below are from the original repository and are credited to their respective owners.
 
@@ -169,8 +169,11 @@ export default () => {
 ## Documentation
 
 * [`scanDocument(...)`](#scandocument)
+* [Response sanitization (since v0.2.2)](#response-sanitization-since-v022)
 * [Barcode extraction (optional feature)](#barcode-extraction-optional-feature)
 * [`extractBarcodesFromImages(...)`](#extractbarcodesfromimages)
+* [`analyzeScannedImages(...)`](#analyzescannedimages)
+* [`scanAndAnalyzeDocument(...)`](#scanandanalyzedocument)
 * [Interfaces](#interfaces)
 * [Enums](#enums)
 
@@ -209,30 +212,16 @@ if (status === 'success' && scannedImages.length) {
 
 ### Barcode extraction (optional feature)
 
-Barcode extraction is a post-processing stage that runs after document capture when you call:
+Barcode extraction is an optional post-processing stage. `scanDocument(...)` stays fast and scan-only.
+Run extraction after capture:
 
 ```ts
-const result = await DocumentScanner.scanDocument({
-  responseType: 'imageFilePath',
-  extractBarcodes: true,
-  barcodeFormats: ['ean13', 'itf'],
-})
-```
-
-You can also run barcode extraction directly on existing images:
-
-```ts
+const scanResult = await DocumentScanner.scanDocument({ responseType: 'imageFilePath' })
 const barcodes = await DocumentScanner.extractBarcodesFromImages(
-  scannedImages,
-  { barcodeFormats: ['ean13', 'itf'] }
+  scanResult.scannedImages,
+  { barcodeFormats: ['ean13', 'itf'], concurrency: 2 }
 )
 ```
-
-`scanDocument` remains backward compatible:
-- `status` and `scannedImages: string[]` are unchanged.
-- Barcode data is returned in optional fields:
-  - `barcodes?: Barcode[]`
-  - `barcodeExtractionStatus?: 'success' | 'not_enabled' | 'failed'`
 
 Barcode extraction is disabled by default at build time.
 
@@ -255,8 +244,7 @@ cd ios
 DOCUMENT_SCANNER_ENABLE_BARCODE=1 pod install
 ```
 
-If `extractBarcodes: true` is requested but the feature is not enabled in the native build, scanning still succeeds and `barcodeExtractionStatus` is returned as `'not_enabled'`.
-For `extractBarcodesFromImages(...)` in the same situation, the call rejects with `barcode_not_enabled`.
+If barcode feature is not enabled in the native build, `extractBarcodesFromImages(...)` rejects with `barcode_not_enabled`.
 
 ### extractBarcodesFromImages(...)
 
@@ -278,6 +266,55 @@ Extracts barcodes from existing images without opening scanner UI.
 
 --------------------
 
+### analyzeScannedImages(...)
+
+```typescript
+analyzeScannedImages(
+  images: string[],
+  options: AnalyzeScannedImagesOptions
+) => Promise<AnalysisResult>
+```
+
+Universal post-processing over scanned images.
+Right now barcode extraction is implemented; OCR/table/structured extractors are placeholders for future versions.
+
+```ts
+const analysis = await DocumentScanner.analyzeScannedImages(scannedImages, {
+  extract: { barcodes: true },
+  barcodeFormats: ['qr', 'ean13'],
+  concurrency: 2,
+})
+```
+
+**Returns:** <code>Promise&lt;<a href="#analysisresult">AnalysisResult</a>&gt;</code>
+
+--------------------
+
+### scanAndAnalyzeDocument(...)
+
+```typescript
+scanAndAnalyzeDocument(
+  options: ScanAndAnalyzeDocumentOptions
+) => Promise<ScanAndAnalyzeDocumentResponse>
+```
+
+Convenience sugar for one-call flow:
+`scanDocument(...) -> analyzeScannedImages(...)`.
+
+```ts
+const result = await DocumentScanner.scanAndAnalyzeDocument({
+  responseType: 'imageFilePath',
+  analysis: {
+    extract: { barcodes: true },
+    barcodeFormats: ['qr'],
+    concurrency: 2,
+  },
+})
+```
+
+**Returns:** <code>Promise&lt;<a href="#scanandanalyzedocumentresponse">ScanAndAnalyzeDocumentResponse</a>&gt;</code>
+
+--------------------
 
 ### Interfaces
 
@@ -288,26 +325,72 @@ Extracts barcodes from existing images without opening scanner UI.
 | ------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | **`scannedImages`** | <code>string[]</code>                                                             | Array of valid file URIs or base64 strings (already sanitized by the module).                                                     |
 | **`status`**        | <code><a href="#scandocumentresponsestatus">ScanDocumentResponseStatus</a></code> | The status lets you know if the document scan completes successfully, or if the user cancels before completing the document scan. |
-| **`barcodes`**      | <code><a href="#barcode">Barcode</a>[]</code>                                     | Optional list of extracted barcodes when `extractBarcodes` is requested and the native feature is enabled.                       |
-| **`barcodeExtractionStatus`** | <code>'success' \\| 'not_enabled' \\| 'failed'</code>                 | Optional status for barcode post-processing.                                                                                       |
 
 
 #### ScanDocumentOptions
 
-| Prop                    | Type                                                  | Description                                                                                                                                                                                                                                                                                                                               | Default                                   |
-| ----------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| **`croppedImageQuality`**   | <code>number</code>                                   | The quality of the cropped image from 0 - 100. 100 is the best quality.                                                                                                                                                                                                                                                | <code>: 100</code>                         |
-| **`maxNumDocuments`**   | <code>number</code>                                   | Android only: The maximum number of photos an user can take (not counting photo retakes)                                                                                                                                                                                                                                                  | <code>: undefined</code>                         |
-| **`responseType`**      | <code><a href="#responsetype">ResponseType</a></code> | The response comes back in this format on success. It can be the document scan image file paths or base64 images.                                                                                                                                                                                                                         | <code>: ResponseType.ImageFilePath</code> |
-| **`extractBarcodes`**   | <code>boolean</code>                                  | Optional barcode extraction after document capture. Requires native barcode feature to be enabled at build time.                                                                                                                                                                                                                            | <code>: false</code> |
-| **`barcodeFormats`**    | <code><a href="#barcode">Barcode</a>['format'][]</code> | Optional allow-list of normalized barcode formats used during extraction. When omitted, all supported formats are scanned. | <code>: undefined</code> |
+| Prop                    | Type                                                  | Description                                                                                                                                                                      | Default                                   |
+| ----------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| **`croppedImageQuality`**   | <code>number</code>                                   | The quality of the cropped image from 0 - 100. 100 is the best quality.                                                                                                        | <code>: 100</code>                        |
+| **`maxNumDocuments`**   | <code>number</code>                                   | Android only: The maximum number of photos an user can take (not counting photo retakes).                                                                                      | <code>: undefined</code>                  |
+| **`responseType`**      | <code><a href="#responsetype">ResponseType</a></code> | The response comes back in this format on success. It can be the document scan image file paths or base64 images.                                                             | <code>: ResponseType.ImageFilePath</code> |
 
 
 #### ExtractBarcodesFromImagesOptions
 
-| Prop                | Type                                      | Description                                                                                               | Default |
-| ------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------- |
+| Prop                | Type                                                | Description                                                                                               | Default |
+| ------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------- |
 | **`barcodeFormats`** | <code><a href="#barcode">Barcode</a>['format'][]</code> | Optional allow-list of normalized barcode formats used during extraction. When omitted, all supported formats are scanned. | <code>: undefined</code> |
+| **`concurrency`**   | <code>1 \\| 2</code>                                | Maximum native worker concurrency for barcode extraction. Native implementations clamp values to <code>1..2</code>. | <code>: 2</code> |
+
+
+#### AnalyzeExtractOptions
+
+| Prop                | Type               | Description |
+| ------------------- | ------------------ | ----------- |
+| **`barcodes`**      | <code>boolean</code> | Enable barcode extraction stage. |
+| **`text`**          | <code>boolean</code> | Reserved for future OCR extraction. |
+| **`tables`**        | <code>boolean</code> | Reserved for future table extraction. |
+| **`structuredData`**| <code>boolean</code> | Reserved for future structured document extraction. |
+
+
+#### AnalyzeScannedImagesOptions
+
+| Prop                | Type                                                           | Description |
+| ------------------- | -------------------------------------------------------------- | ----------- |
+| **`extract`**       | <code><a href="#analyzeextractoptions">AnalyzeExtractOptions</a></code> | Extractor toggles for image analysis. |
+| **`barcodeFormats`**| <code><a href="#barcode">Barcode</a>['format'][]</code>       | Optional barcode format allow-list for barcode stage. |
+| **`concurrency`**   | <code>1 \\| 2</code>                                           | Optional native worker concurrency for barcode stage. |
+
+
+#### AnalysisResult
+
+| Prop                | Type                                                                                  | Description |
+| ------------------- | ------------------------------------------------------------------------------------- | ----------- |
+| **`status`**        | <code>'success' \\| 'partial' \\| 'failed' \\| 'not_enabled'</code>                  | Aggregate status of requested analysis stages. |
+| **`barcodes`**      | <code><a href="#barcode">Barcode</a>[]</code>                                        | Extracted barcodes when requested and available. |
+| **`text`**          | <code>{ text: string; sourceImageIndex: number; confidence?: number }[]</code>      | Reserved placeholder for OCR blocks. |
+| **`tables`**        | <code>{ rows: string[][]; sourceImageIndex: number }[]</code>                        | Reserved placeholder for table extraction. |
+| **`structuredData`**| <code>Record&lt;string, unknown&gt;</code>                                           | Reserved placeholder for structured extraction. |
+
+
+#### ScanAndAnalyzeDocumentOptions
+
+| Prop                | Type                                                                 | Description |
+| ------------------- | -------------------------------------------------------------------- | ----------- |
+| **`analysis`**      | <code><a href="#analyzescannedimagesoptions">AnalyzeScannedImagesOptions</a></code> | Analysis options for post-processing stage. |
+| **`croppedImageQuality`** | <code>number</code>                                            | Same as <code>ScanDocumentOptions</code>. |
+| **`maxNumDocuments`** | <code>number</code>                                                | Same as <code>ScanDocumentOptions</code> (Android only). |
+| **`responseType`**   | <code><a href="#responsetype">ResponseType</a></code>              | Same as <code>ScanDocumentOptions</code>. |
+
+
+#### ScanAndAnalyzeDocumentResponse
+
+| Prop                | Type                                                                              | Description |
+| ------------------- | --------------------------------------------------------------------------------- | ----------- |
+| **`status`**        | <code><a href="#scandocumentresponsestatus">ScanDocumentResponseStatus</a></code> | Scan status. |
+| **`scannedImages`** | <code>string[]</code>                                                             | Captured and sanitized images. |
+| **`analysis`**      | <code><a href="#analysisresult">AnalysisResult</a></code>                        | Post-processing result payload. |
 
 
 #### Barcode
@@ -395,7 +478,7 @@ export default () => {
 
 ## Migrating between upstream and this fork
 
-Both packages expose the same public API. To switch:
+Both packages are compatible for the core scan flow (`scanDocument(...)`). To switch:
 
 - **From this fork to upstream**
   ```bash

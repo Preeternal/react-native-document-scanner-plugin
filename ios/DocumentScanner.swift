@@ -5,10 +5,6 @@ import React
 @objc(DocumentScannerImpl)
 public class DocumentScannerImpl: NSObject {
   private var docScanner: DocScanner?
-  private let barcodeQueue = DispatchQueue(
-    label: "com.preeternal.document-scanner.barcode",
-    qos: .userInitiated
-  )
 
   @objc static func requiresMainQueueSetup() -> Bool { true }
 
@@ -27,9 +23,6 @@ public class DocumentScannerImpl: NSObject {
     let responseType = opts["responseType"] as? String
     let quality = opts["croppedImageQuality"] as? Int
     let isBase64Response = responseType?.lowercased() == "base64"
-    let shouldExtractBarcodes = opts["extractBarcodes"] as? Bool ?? false
-    let barcodeFormats = (opts["barcodeFormats"] as? [Any] ?? [])
-      .compactMap { $0 as? String }
 
     DispatchQueue.main.async {
       self.docScanner = DocScanner()
@@ -38,9 +31,7 @@ public class DocumentScannerImpl: NSObject {
         successHandler: { (scannedData: [[String: Any]]) in
           let fm = FileManager.default
           var sanitizedImages: [String] = []
-          var extractedBarcodes: [[String: Any]] = []
 
-          // Keep the same sanitization guarantees as the original API.
           for item in scannedData {
             guard let rawImage = item["image"] as? String else { continue }
             let trimmed = rawImage.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -58,49 +49,13 @@ public class DocumentScannerImpl: NSObject {
               }
             }
 
-            let sourceImageIndex = sanitizedImages.count
             sanitizedImages.append(trimmed)
-
-            guard shouldExtractBarcodes && BarcodeFeatureFlags.isEnabled else {
-              continue
-            }
-
-            guard let pageBarcodes = item["barcodes"] as? [[String: Any]] else {
-              continue
-            }
-
-            // Flatten page-local barcodes into API-level barcodes with sourceImageIndex.
-            for barcode in pageBarcodes {
-              guard let value = barcode["value"] as? String,
-                    !value.isEmpty else {
-                continue
-              }
-
-              let format = (barcode["format"] as? String) ?? "unknown"
-              extractedBarcodes.append([
-                "value": value,
-                "format": format,
-                "sourceImageIndex": sourceImageIndex
-              ])
-            }
           }
 
-          var payload: [String: Any] = [
+          resolve([
             "status": "success",
             "scannedImages": sanitizedImages
-          ]
-
-          // Barcode payload is optional and only returned when explicitly requested.
-          if shouldExtractBarcodes {
-            if BarcodeFeatureFlags.isEnabled {
-              payload["barcodes"] = extractedBarcodes
-              payload["barcodeExtractionStatus"] = "success"
-            } else {
-              payload["barcodeExtractionStatus"] = "not_enabled"
-            }
-          }
-
-          resolve(payload)
+          ])
           self.docScanner = nil
         },
         errorHandler: { msg in
@@ -108,20 +63,14 @@ public class DocumentScannerImpl: NSObject {
           self.docScanner = nil
         },
         cancelHandler: {
-          var payload: [String: Any] = [
+          resolve([
             "status": "cancel",
             "scannedImages": []
-          ]
-          if shouldExtractBarcodes && !BarcodeFeatureFlags.isEnabled {
-            payload["barcodeExtractionStatus"] = "not_enabled"
-          }
-          resolve(payload)
+          ])
           self.docScanner = nil
         },
         responseType: responseType,
-        croppedImageQuality: quality,
-        extractBarcodes: shouldExtractBarcodes,
-        barcodeFormats: barcodeFormats
+        croppedImageQuality: quality
       )
     }
   }
@@ -151,22 +100,36 @@ public class DocumentScannerImpl: NSObject {
     let allowedFormats = (opts["barcodeFormats"] as? [Any] ?? [])
       .compactMap { $0 as? String }
 
+    let requestedConcurrency = opts["concurrency"] as? Int ?? 2
+    let concurrency = max(1, min(2, requestedConcurrency))
+
     if rawImages.isEmpty {
       resolve([])
       return
     }
 
-    barcodeQueue.async {
-      #if DOCUMENT_SCANNER_ENABLE_BARCODE
-      var extractedBarcodes: [[String: Any]] = []
+    #if DOCUMENT_SCANNER_ENABLE_BARCODE
+    let queue = OperationQueue()
+    queue.name = "com.preeternal.document-scanner.barcode"
+    queue.qualityOfService = .userInitiated
+    queue.maxConcurrentOperationCount = concurrency
 
-      for (sourceImageIndex, source) in rawImages.enumerated() {
-        guard let imageSource = source as? String else {
-          continue
-        }
+    let lock = NSLock()
+    let group = DispatchGroup()
+    var extractedBarcodes: [[String: Any]] = []
+
+    for (sourceImageIndex, source) in rawImages.enumerated() {
+      guard let imageSource = source as? String,
+            !imageSource.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        continue
+      }
+
+      group.enter()
+      queue.addOperation {
+        defer { group.leave() }
 
         guard let image = BarcodeImageSource.loadImage(from: imageSource) else {
-          continue
+          return
         }
 
         let detected = BarcodeExtractor.extractFromImage(
@@ -174,27 +137,55 @@ public class DocumentScannerImpl: NSObject {
           allowedFormats: allowedFormats
         )
 
-        for barcode in detected where !barcode.value.isEmpty {
-          extractedBarcodes.append([
-            "value": barcode.value,
+        guard !detected.isEmpty else {
+          return
+        }
+
+        let mapped = detected.compactMap { barcode -> [String: Any]? in
+          let value = barcode.value.trimmingCharacters(in: .whitespacesAndNewlines)
+          guard !value.isEmpty else {
+            return nil
+          }
+
+          return [
+            "value": value,
             "format": barcode.format,
             "sourceImageIndex": sourceImageIndex
-          ])
+          ]
         }
+
+        guard !mapped.isEmpty else {
+          return
+        }
+
+        lock.lock()
+        extractedBarcodes.append(contentsOf: mapped)
+        lock.unlock()
+      }
+    }
+
+    group.notify(queue: .main) {
+      let sorted = extractedBarcodes.sorted { lhs, rhs in
+        let lhsIndex = lhs["sourceImageIndex"] as? Int ?? Int.max
+        let rhsIndex = rhs["sourceImageIndex"] as? Int ?? Int.max
+
+        if lhsIndex != rhsIndex {
+          return lhsIndex < rhsIndex
+        }
+
+        let lhsValue = lhs["value"] as? String ?? ""
+        let rhsValue = rhs["value"] as? String ?? ""
+        return lhsValue < rhsValue
       }
 
-      DispatchQueue.main.async {
-        resolve(extractedBarcodes)
-      }
-      #else
-      DispatchQueue.main.async {
-        reject(
-          "barcode_not_enabled",
-          "Barcode extraction feature is disabled. Enable DOCUMENT_SCANNER_ENABLE_BARCODE=1 before pod install.",
-          nil
-        )
-      }
-      #endif
+      resolve(sorted)
     }
+    #else
+    reject(
+      "barcode_not_enabled",
+      "Barcode extraction feature is disabled. Enable DOCUMENT_SCANNER_ENABLE_BARCODE=1 before pod install.",
+      nil
+    )
+    #endif
   }
 }
