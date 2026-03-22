@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.util.Base64
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
@@ -62,7 +63,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
   companion object {
     const val NAME = "DocumentScanner"
     private const val ANDROID_15_API = 35
-    private const val BARCODE_EXTRACTION_TIMEOUT_MS = 20_000L
+    private const val BARCODE_EXTRACTION_TIMEOUT_MS = 10_000L
     private const val TEXT_EXTRACTION_TIMEOUT_MS = 25_000L
   }
 
@@ -538,7 +539,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     sourceImageIndex: Int,
     allowedFormats: Set<String>
   ): List<BarcodeResult> {
-    return withTimeoutOrNull(BARCODE_EXTRACTION_TIMEOUT_MS) {
+    val detected = withTimeoutOrNull(BARCODE_EXTRACTION_TIMEOUT_MS) {
       suspendCancellableCoroutine { continuation ->
         barcodeExtractor.extractFromSource(
           context = context,
@@ -551,7 +552,17 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
           }
         }
       }
-    } ?: emptyList()
+    }
+
+    if (detected == null) {
+      Log.w(
+        NAME,
+        "Barcode extraction timed out after ${BARCODE_EXTRACTION_TIMEOUT_MS}ms for sourceImageIndex=$sourceImageIndex"
+      )
+      return emptyList()
+    }
+
+    return detected
   }
 
   private suspend fun extractTextInParallel(

@@ -250,6 +250,9 @@ Special values: `all` (enable every analysis feature) and `none` (disable all).
 
 If barcode feature is not enabled in the Android native build, `extractBarcodesFromImages(...)` rejects with `barcode_not_enabled`.
 
+When enabled, barcode extraction is best-effort: Android uses an internal per-image timeout (10 seconds).
+If a page times out, the method still resolves with what was found so far (possibly `[]`) and does not throw a timeout error.
+
 ### extractBarcodesFromImages(...)
 
 ```typescript
