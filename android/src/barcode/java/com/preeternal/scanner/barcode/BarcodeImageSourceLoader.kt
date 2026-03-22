@@ -31,7 +31,7 @@ internal object BarcodeImageSourceLoader {
     }
 
     if (normalized.startsWith("file://", ignoreCase = true)) {
-      return loadFromFilePath(Uri.parse(normalized).path)
+      return loadFromFilePath(resolveFilePathFromUri(Uri.parse(normalized)))
     }
 
     if (File(normalized).exists()) {
@@ -45,8 +45,9 @@ internal object BarcodeImageSourceLoader {
     val parsed = Uri.parse(normalized)
     return when (parsed.scheme?.lowercase()) {
       "content" -> loadFromUri(context, parsed)
-      "file" -> loadFromFilePath(parsed.path)
-      else -> null
+      "file" -> loadFromFilePath(resolveFilePathFromUri(parsed))
+      null, "" -> loadFromFilePath(normalized)
+      else -> loadFromUri(context, parsed)
     }
   }
 
@@ -60,31 +61,47 @@ internal object BarcodeImageSourceLoader {
   }
 
   private fun loadFromUri(context: Context, uri: Uri): Bitmap? {
-    val bitmap = context.contentResolver.openInputStream(uri)?.use { decodeSampledBitmap(it) }
-      ?: return null
-    val orientation = context.contentResolver.openInputStream(uri)?.use {
-      readOrientation(it)
-    } ?: ExifInterface.ORIENTATION_NORMAL
+    return try {
+      val bitmap = context.contentResolver.openInputStream(uri)?.use { decodeSampledBitmap(it) }
+        ?: return null
+      val orientation = context.contentResolver.openInputStream(uri)?.use {
+        readOrientation(it)
+      } ?: ExifInterface.ORIENTATION_NORMAL
 
-    return rotateBitmapIfRequired(bitmap, orientation)
+      rotateBitmapIfRequired(bitmap, orientation)
+    } catch (_: Exception) {
+      null
+    }
   }
 
   private fun loadFromFilePath(path: String?): Bitmap? {
-    if (path.isNullOrBlank()) {
+    val normalized = path?.trim()
+    if (normalized.isNullOrBlank()) {
       return null
     }
 
-    val file = File(path)
+    val decoded = Uri.decode(normalized)
+    val candidatePath = when {
+      File(normalized).exists() -> normalized
+      decoded != normalized && File(decoded).exists() -> decoded
+      else -> normalized
+    }
+
+    val file = File(candidatePath)
     if (!file.exists() || !file.isFile) {
       return null
     }
 
-    val bitmap = FileInputStream(file).use { decodeSampledBitmap(it) } ?: return null
-    val orientation = FileInputStream(file).use {
-      readOrientation(it)
-    }
+    return try {
+      val bitmap = FileInputStream(file).use { decodeSampledBitmap(it) } ?: return null
+      val orientation = FileInputStream(file).use {
+        readOrientation(it)
+      }
 
-    return rotateBitmapIfRequired(bitmap, orientation)
+      rotateBitmapIfRequired(bitmap, orientation)
+    } catch (_: Exception) {
+      null
+    }
   }
 
   private fun decodeSampledBitmap(stream: InputStream): Bitmap? {
@@ -160,5 +177,10 @@ internal object BarcodeImageSourceLoader {
   private fun looksLikeBase64(value: String): Boolean {
     val compact = value.replace("\\s".toRegex(), "")
     return compact.length >= 32 && compact.length % 4 == 0 && base64Regex.matches(compact)
+  }
+
+  private fun resolveFilePathFromUri(uri: Uri): String? {
+    val rawPath = uri.path ?: return null
+    return Uri.decode(rawPath)
   }
 }
