@@ -40,6 +40,11 @@ RCT_EXPORT_MODULE()
   [self.impl extractBarcodesFromImages:options resolve:resolve reject:reject];
 }
 
+- (void)invalidate
+{
+  [self.impl invalidate];
+}
+
 #if RCT_NEW_ARCH_ENABLED
 - (void)scanDocument:(JS::NativeDocumentScanner::ScanDocumentOptions &)options
              resolve:(RCTPromiseResolveBlock)resolve

@@ -5,6 +5,13 @@ import React
 @objc(DocumentScannerImpl)
 public class DocumentScannerImpl: NSObject {
   private var docScanner: DocScanner?
+  private let barcodeQueue: OperationQueue = {
+    let queue = OperationQueue()
+    queue.name = "com.preeternal.document-scanner.barcode"
+    queue.maxConcurrentOperationCount = 2
+    queue.qualityOfService = .utility
+    return queue
+  }()
 
   @objc static func requiresMainQueueSetup() -> Bool { true }
 
@@ -109,11 +116,7 @@ public class DocumentScannerImpl: NSObject {
     }
 
     #if DOCUMENT_SCANNER_ENABLE_BARCODE
-    let queue = OperationQueue()
-    queue.name = "com.preeternal.document-scanner.barcode"
-    queue.qualityOfService = .userInitiated
-    queue.maxConcurrentOperationCount = concurrency
-
+    let requestLimiter = DispatchSemaphore(value: concurrency)
     let lock = NSLock()
     let group = DispatchGroup()
     var extractedBarcodes: [[String: Any]] = []
@@ -124,9 +127,22 @@ public class DocumentScannerImpl: NSObject {
         continue
       }
 
+      let operation = BlockOperation()
       group.enter()
-      queue.addOperation {
-        defer { group.leave() }
+      operation.completionBlock = {
+        group.leave()
+      }
+      operation.addExecutionBlock { [weak operation] in
+        guard let operation = operation, !operation.isCancelled else {
+          return
+        }
+
+        requestLimiter.wait()
+        defer { requestLimiter.signal() }
+
+        guard !operation.isCancelled else {
+          return
+        }
 
         guard let image = BarcodeImageSource.loadImage(from: imageSource) else {
           return
@@ -162,6 +178,7 @@ public class DocumentScannerImpl: NSObject {
         extractedBarcodes.append(contentsOf: mapped)
         lock.unlock()
       }
+      barcodeQueue.addOperation(operation)
     }
 
     group.notify(queue: .main) {
@@ -187,5 +204,11 @@ public class DocumentScannerImpl: NSObject {
       nil
     )
     #endif
+  }
+
+  @objc
+  public func invalidate() {
+    docScanner = nil
+    barcodeQueue.cancelAllOperations()
   }
 }
