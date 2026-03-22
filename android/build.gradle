@@ -25,12 +25,30 @@ def getExtOrIntegerDefault(name) {
   return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["DocumentScanner_" + name]).toInteger()
 }
 
-def barcodeFeatureEnabled =
-  (project.findProperty("enableBarcode")
-    ?: project.findProperty("DocumentScanner_enableBarcode")
-    ?: "false")
-    .toString()
-    .toBoolean()
+def parseFeatureList = { rawValue ->
+  def raw = (rawValue ?: "").toString().toLowerCase()
+  def values = raw.split(",")
+    .collect { it.trim() }
+    .findAll { !it.isEmpty() }
+    .toSet()
+
+  if (values.contains("none")) {
+    values = values - "none"
+  }
+
+  if (values.contains("all")) {
+    values += ["barcode", "text", "tables"]
+  }
+
+  return values
+}
+
+def analysisFeaturesRaw =
+  (project.findProperty("DocumentScanner_analysisFeatures")
+    ?: "")
+
+def analysisFeatures = parseFeatureList(analysisFeaturesRaw)
+def barcodeFeatureEnabled = analysisFeatures.contains("barcode")
 
 android {
   namespace "com.preeternal.scanner"
@@ -40,11 +58,6 @@ android {
   defaultConfig {
     minSdkVersion getExtOrIntegerDefault("minSdkVersion")
     targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
-    buildConfigField "boolean", "BARCODE_FEATURE_ENABLED", barcodeFeatureEnabled ? "true" : "false"
-  }
-
-  buildFeatures {
-    buildConfig true
   }
 
   buildTypes {

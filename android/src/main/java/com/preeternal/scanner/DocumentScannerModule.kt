@@ -100,7 +100,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     if (!barcodeExtractor.isFeatureEnabled()) {
       promise.reject(
         "barcode_not_enabled",
-        "Barcode extraction feature is disabled. Enable -PenableBarcode=true to build with barcode support."
+        "Barcode extraction feature is disabled. Enable -PDocumentScanner_analysisFeatures=barcode to build with barcode support."
       )
       return
     }

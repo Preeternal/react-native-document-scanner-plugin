@@ -1,4 +1,3 @@
-#if DOCUMENT_SCANNER_ENABLE_BARCODE
 import CoreGraphics
 import Foundation
 import UIKit
@@ -235,4 +234,3 @@ private extension UIImage {
     return rotated
   }
 }
-#endif

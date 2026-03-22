@@ -228,23 +228,26 @@ Barcode extraction is disabled by default at build time.
 Enable on Android (includes ML Kit barcode dependency only when enabled):
 
 ```bash
-./gradlew :react-native-document-scanner-plugin:assemble -PenableBarcode=true
+./gradlew :react-native-document-scanner-plugin:assemble -PDocumentScanner_analysisFeatures=barcode
 ```
 
 or add this to `android/gradle.properties`:
 
 ```properties
-DocumentScanner_enableBarcode=true
+DocumentScanner_analysisFeatures=barcode
 ```
 
-Enable on iOS before `pod install`:
+Why Android needs this extra flag:
 
-```bash
-cd ios
-DOCUMENT_SCANNER_ENABLE_BARCODE=1 pod install
-```
+- Barcode extraction relies on additional native dependencies (`com.google.mlkit:barcode-scanning` and `androidx.exifinterface`).
+- Keeping it opt-in avoids adding those dependencies and their APK/AAB size impact for apps that only need core document scanning.
 
-If barcode feature is not enabled in the native build, `extractBarcodesFromImages(...)` rejects with `barcode_not_enabled`.
+iOS does not require an additional build flag for barcode extraction.
+
+Android flag accepts a comma-separated list: `barcode,text,tables`.
+Special values: `all` (enable every analysis feature) and `none` (disable all).
+
+If barcode feature is not enabled in the Android native build, `extractBarcodesFromImages(...)` rejects with `barcode_not_enabled`.
 
 ### extractBarcodesFromImages(...)
 

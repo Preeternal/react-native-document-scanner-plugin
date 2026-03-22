@@ -1,11 +1,6 @@
 require "json"
 
 package = JSON.parse(File.read(File.join(__dir__, "package.json")))
-barcode_enabled = ENV["DOCUMENT_SCANNER_ENABLE_BARCODE"] == "1"
-swift_conditions = ['$(inherited)']
-if barcode_enabled
-  swift_conditions << 'DOCUMENT_SCANNER_ENABLE_BARCODE'
-end
 
 Pod::Spec.new do |s|
   s.name         = "DocumentScanner"
@@ -19,8 +14,7 @@ Pod::Spec.new do |s|
   s.swift_version = '5.9'
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    'SWIFT_INSTALL_OBJC_HEADER' => 'YES',
-    'SWIFT_ACTIVE_COMPILATION_CONDITIONS' => swift_conditions.join(' ')
+    'SWIFT_INSTALL_OBJC_HEADER' => 'YES'
   }
   s.source       = { :git => "https://github.com/Preeternal/react-native-document-scanner-plugin.git", :tag => "#{s.version}" }
   s.source_files = "ios/**/*.{h,m,mm,swift}"

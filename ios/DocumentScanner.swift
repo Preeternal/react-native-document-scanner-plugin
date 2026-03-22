@@ -93,15 +93,6 @@ public class DocumentScannerImpl: NSObject {
       return
     }
 
-    guard BarcodeFeatureFlags.isEnabled else {
-      reject(
-        "barcode_not_enabled",
-        "Barcode extraction feature is disabled. Enable DOCUMENT_SCANNER_ENABLE_BARCODE=1 before pod install.",
-        nil
-      )
-      return
-    }
-
     let opts = options as? [String: Any] ?? [:]
     let rawImages = opts["images"] as? [Any] ?? []
     let allowedFormats = (opts["barcodeFormats"] as? [Any] ?? [])
@@ -115,7 +106,6 @@ public class DocumentScannerImpl: NSObject {
       return
     }
 
-    #if DOCUMENT_SCANNER_ENABLE_BARCODE
     let requestLimiter = DispatchSemaphore(value: concurrency)
     let lock = NSLock()
     let group = DispatchGroup()
@@ -197,13 +187,6 @@ public class DocumentScannerImpl: NSObject {
 
       resolve(sorted)
     }
-    #else
-    reject(
-      "barcode_not_enabled",
-      "Barcode extraction feature is disabled. Enable DOCUMENT_SCANNER_ENABLE_BARCODE=1 before pod install.",
-      nil
-    )
-    #endif
   }
 
   @objc
