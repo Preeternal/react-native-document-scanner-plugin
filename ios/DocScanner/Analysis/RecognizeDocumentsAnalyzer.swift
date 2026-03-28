@@ -168,6 +168,19 @@ enum RecognizeDocumentsAnalyzer {
       }
     }
 
+    if options.includeStructuredData {
+      for (key, value) in fields where StructuredDataNormalizer.isLikelyIdField(key) {
+        appendNormalizedEntity(
+          type: "id",
+          rawValue: value,
+          sourceImageIndex: sourceImageIndex,
+          boundingBox: nil,
+          entities: &entities,
+          dedup: &dedupEntities
+        )
+      }
+    }
+
     let sortedTextBlocks = textBlocks.sorted { lhs, rhs in
       if lhs.sourceImageIndex != rhs.sourceImageIndex {
         return lhs.sourceImageIndex < rhs.sourceImageIndex
@@ -321,11 +334,9 @@ enum RecognizeDocumentsAnalyzer {
         }
 
         if rowValues.count >= 2 {
-          let key = rowValues[0]
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .replacingOccurrences(of: "[^a-z0-9а-я]+", with: "_", options: .regularExpression)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+          let key = StructuredDataNormalizer.normalizeFieldKey(
+            rowValues[0].trimmingCharacters(in: .whitespacesAndNewlines)
+          )
           let value = rowValues[1].trimmingCharacters(in: .whitespacesAndNewlines)
           if !key.isEmpty && !value.isEmpty {
             fields[key] = value
@@ -420,26 +431,52 @@ enum RecognizeDocumentsAnalyzer {
         continue
       }
 
-      let value = mapped.value.trimmingCharacters(in: .whitespacesAndNewlines)
-      if value.isEmpty {
-        continue
-      }
-
-      let dedupKey = "\(mapped.type)|\(sourceImageIndex)|\(value)"
-      if !dedup.insert(dedupKey).inserted {
-        continue
-      }
-
-      entities.append(
-        AnalysisStructuredEntity(
-          type: mapped.type,
-          value: value,
-          sourceImageIndex: sourceImageIndex,
-          boundingBox: toBoundingBox(data.boundingRegion.boundingBox),
-          confidence: nil
-        )
+      appendNormalizedEntity(
+        type: mapped.type,
+        rawValue: mapped.value,
+        sourceImageIndex: sourceImageIndex,
+        boundingBox: toBoundingBox(data.boundingRegion.boundingBox),
+        entities: &entities,
+        dedup: &dedup
       )
     }
+  }
+
+  private static func appendNormalizedEntity(
+    type: String,
+    rawValue: String,
+    sourceImageIndex: Int,
+    boundingBox: AnalysisBoundingBox?,
+    entities: inout [AnalysisStructuredEntity],
+    dedup: inout Set<String>
+  ) {
+    let value = StructuredDataNormalizer.normalizeEntityValue(type: type, value: rawValue)
+    if value.isEmpty {
+      return
+    }
+
+    let dedupValue = StructuredDataNormalizer.normalizedEntityDedupValue(
+      type: type,
+      normalizedValue: value
+    )
+    if dedupValue.isEmpty {
+      return
+    }
+
+    let dedupKey = "\(type)|\(sourceImageIndex)|\(dedupValue)"
+    if !dedup.insert(dedupKey).inserted {
+      return
+    }
+
+    entities.append(
+      AnalysisStructuredEntity(
+        type: type,
+        value: value,
+        sourceImageIndex: sourceImageIndex,
+        boundingBox: boundingBox,
+        confidence: nil
+      )
+    )
   }
 
   private static func normalizedBarcodeValue(from barcode: BarcodeObservation) -> String {

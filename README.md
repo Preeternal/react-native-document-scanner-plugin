@@ -480,6 +480,18 @@ const result = await DocumentScanner.scanAndAnalyzeDocument({
 | **`entities`**      | <code>{ type: 'phone' \\| 'email' \\| 'date' \\| 'amount' \\| 'id' \\| 'unknown'; value: string; sourceImageIndex: number }[]</code> | Inferred typed entities. |
 | **`fields`**        | <code>{ key: string; value: string }[]</code>                                            | Inferred key-value fields from OCR lines. |
 
+Normalization guarantees:
+
+- `date` values are normalized to ISO-like `YYYY-MM-DD` when parser confidence is sufficient.
+- `amount` values are normalized to `CODE value` (for example `USD 1234.56`) when currency can be inferred, otherwise numeric normalized form is returned.
+- `phone` values are normalized to compact digit form (`+` prefix preserved when present in source).
+- `email` values are lowercased, `id` values are uppercased/compacted.
+- `fields[].key` is sanitized to lowercase snake-like form on both platforms.
+
+Best-effort quality note:
+
+- Output shape is stable across platforms, but extraction quality can differ by OS/runtime capabilities (for example iOS modern `RecognizeDocumentsRequest` + data detectors vs regex heuristics on older/other paths).
+
 
 ### Enums
 

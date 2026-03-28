@@ -789,7 +789,14 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
 
     if (data.entities.isNotEmpty()) {
       val entities = WritableNativeArray()
-      for (entity in data.entities) {
+      val sortedEntities = data.entities.sortedWith(
+        compareBy<SemanticStructuredEntity>(
+          { it.sourceImageIndex },
+          { it.type },
+          { it.value }
+        )
+      )
+      for (entity in sortedEntities) {
         entities.pushMap(toWritableStructuredEntity(entity))
       }
       map.putArray("entities", entities)
@@ -797,7 +804,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
 
     if (data.fields.isNotEmpty()) {
       val fields = WritableNativeArray()
-      for ((key, value) in data.fields) {
+      for ((key, value) in data.fields.toSortedMap()) {
         val entry = WritableNativeMap()
         entry.putString("key", key)
         entry.putString("value", value)

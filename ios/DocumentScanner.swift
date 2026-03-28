@@ -798,13 +798,22 @@ public class DocumentScannerImpl: NSObject {
     var map: [String: Any] = [:]
 
     if !structuredData.entities.isEmpty {
-      map["entities"] = structuredData.entities.map(toDictionary)
+      let sortedEntities = structuredData.entities.sorted { lhs, rhs in
+        if lhs.sourceImageIndex != rhs.sourceImageIndex {
+          return lhs.sourceImageIndex < rhs.sourceImageIndex
+        }
+        if lhs.type != rhs.type {
+          return lhs.type < rhs.type
+        }
+        return lhs.value < rhs.value
+      }
+      map["entities"] = sortedEntities.map(toDictionary)
     }
     if !structuredData.fields.isEmpty {
-      let fields = structuredData.fields.map { key, value in
+      let fields = structuredData.fields.keys.sorted().map { key in
         [
           "key": key,
-          "value": value
+          "value": structuredData.fields[key] ?? ""
         ]
       }
       map["fields"] = fields

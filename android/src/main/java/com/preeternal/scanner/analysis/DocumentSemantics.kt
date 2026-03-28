@@ -127,14 +127,21 @@ object DocumentSemantics {
       val text = line.text
 
       fieldRegex.find(text)?.let { match ->
-        val rawKey = match.groupValues.getOrNull(1)?.trim()?.lowercase().orEmpty()
+        val rawKey = match.groupValues.getOrNull(1)?.trim().orEmpty()
         val value = match.groupValues.getOrNull(2)?.trim().orEmpty()
-        val key = rawKey
-          .replace(Regex("[^a-z0-9а-я]+"), "_")
-          .trim('_')
+        val key = StructuredDataNormalizer.normalizeFieldKey(rawKey)
 
         if (key.isNotEmpty() && value.isNotEmpty()) {
           fields[key] = value
+          if (StructuredDataNormalizer.isLikelyIdField(key)) {
+            appendEntityValue(
+              type = "id",
+              rawValue = value,
+              line = line,
+              entities = entities,
+              dedup = dedup
+            )
+          }
         }
       }
 
@@ -159,25 +166,46 @@ object DocumentSemantics {
     dedup: MutableSet<String>
   ) {
     regex.findAll(text).forEach { match ->
-      val value = match.value.trim()
-      if (value.isEmpty()) {
-        return@forEach
-      }
-
-      val dedupKey = "$type|${line.sourceImageIndex}|$value"
-      if (!dedup.add(dedupKey)) {
-        return@forEach
-      }
-
-      entities.add(
-        SemanticStructuredEntity(
-          type = type,
-          value = value,
-          sourceImageIndex = line.sourceImageIndex,
-          boundingBox = line.boundingBox
-        )
+      appendEntityValue(
+        type = type,
+        rawValue = match.value,
+        line = line,
+        entities = entities,
+        dedup = dedup
       )
     }
+  }
+
+  private fun appendEntityValue(
+    type: String,
+    rawValue: String,
+    line: TextLineEntry,
+    entities: MutableList<SemanticStructuredEntity>,
+    dedup: MutableSet<String>
+  ) {
+    val normalizedValue = StructuredDataNormalizer.normalizeEntityValue(type, rawValue)
+    if (normalizedValue.isEmpty()) {
+      return
+    }
+
+    val dedupValue = StructuredDataNormalizer.normalizedEntityDedupValue(type, normalizedValue)
+    if (dedupValue.isEmpty()) {
+      return
+    }
+
+    val dedupKey = "$type|${line.sourceImageIndex}|$dedupValue"
+    if (!dedup.add(dedupKey)) {
+      return
+    }
+
+    entities.add(
+      SemanticStructuredEntity(
+        type = type,
+        value = normalizedValue,
+        sourceImageIndex = line.sourceImageIndex,
+        boundingBox = line.boundingBox
+      )
+    )
   }
 
   private fun flattenTextLines(textBlocks: List<TextBlockResult>): List<TextLineEntry> {

@@ -130,13 +130,20 @@ enum DocumentSemantics {
       let text = line.text
 
       if let match = firstMatchGroups(using: fieldRegex, in: text), match.count >= 2 {
-        let rawKey = match[0].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let rawKey = match[0].trimmingCharacters(in: .whitespacesAndNewlines)
         let value = match[1].trimmingCharacters(in: .whitespacesAndNewlines)
-        let key = rawKey
-          .replacingOccurrences(of: "[^a-z0-9а-я]+", with: "_", options: .regularExpression)
-          .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+        let key = StructuredDataNormalizer.normalizeFieldKey(rawKey)
         if !key.isEmpty && !value.isEmpty {
           fields[key] = value
+          if StructuredDataNormalizer.isLikelyIdField(key) {
+            appendEntityValue(
+              type: "id",
+              rawValue: value,
+              line: line,
+              entities: &entities,
+              dedup: &dedup
+            )
+          }
         }
       }
 
@@ -300,26 +307,50 @@ enum DocumentSemantics {
     let matches = regex.matches(in: text, options: [], range: range)
 
     for match in matches {
-      let value = ns.substring(with: match.range).trimmingCharacters(in: .whitespacesAndNewlines)
-      if value.isEmpty {
-        continue
-      }
-
-      let dedupKey = "\(type)|\(line.sourceImageIndex)|\(value)"
-      if dedup.contains(dedupKey) {
-        continue
-      }
-      dedup.insert(dedupKey)
-
-      entities.append(
-        AnalysisStructuredEntity(
-          type: type,
-          value: value,
-          sourceImageIndex: line.sourceImageIndex,
-          boundingBox: line.boundingBox,
-          confidence: nil
-        )
+      appendEntityValue(
+        type: type,
+        rawValue: ns.substring(with: match.range),
+        line: line,
+        entities: &entities,
+        dedup: &dedup
       )
     }
+  }
+
+  private static func appendEntityValue(
+    type: String,
+    rawValue: String,
+    line: TextLineEntry,
+    entities: inout [AnalysisStructuredEntity],
+    dedup: inout Set<String>
+  ) {
+    let normalizedValue = StructuredDataNormalizer.normalizeEntityValue(type: type, value: rawValue)
+    if normalizedValue.isEmpty {
+      return
+    }
+
+    let dedupValue = StructuredDataNormalizer.normalizedEntityDedupValue(
+      type: type,
+      normalizedValue: normalizedValue
+    )
+    if dedupValue.isEmpty {
+      return
+    }
+
+    let dedupKey = "\(type)|\(line.sourceImageIndex)|\(dedupValue)"
+    if dedup.contains(dedupKey) {
+      return
+    }
+    dedup.insert(dedupKey)
+
+    entities.append(
+      AnalysisStructuredEntity(
+        type: type,
+        value: normalizedValue,
+        sourceImageIndex: line.sourceImageIndex,
+        boundingBox: line.boundingBox,
+        confidence: nil
+      )
+    )
   }
 }
