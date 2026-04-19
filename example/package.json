@@ -10,19 +10,22 @@
     "build:ios": "react-native build-ios --mode Debug"
   },
   "dependencies": {
+    "@react-native-documents/picker": "^11.0.3",
     "react": "19.0.0",
-    "react-native": "0.79.2"
+    "react-native": "0.79.7",
+    "react-native-image-picker": "^8.2.1",
+    "react-native-safe-area-context": "^5.7.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.25.2",
+    "@babel/core": "^7.29.0",
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
     "@react-native-community/cli": "18.0.0",
     "@react-native-community/cli-platform-android": "18.0.0",
     "@react-native-community/cli-platform-ios": "18.0.0",
-    "@react-native/babel-preset": "0.79.2",
-    "@react-native/metro-config": "0.79.2",
-    "@react-native/typescript-config": "0.79.2",
+    "@react-native/babel-preset": "0.79.7",
+    "@react-native/metro-config": "0.79.7",
+    "@react-native/typescript-config": "0.79.7",
     "@types/react": "^19.0.0",
     "react-native-builder-bob": "^0.40.13",
     "react-native-monorepo-config": "^0.1.9"

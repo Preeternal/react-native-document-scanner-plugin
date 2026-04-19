@@ -12,6 +12,10 @@ on:
     types:
       - checks_requested
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -52,10 +56,15 @@ jobs:
       - name: Build package
         run: yarn prepare
 
-  build-android:
+  expo-prebuild:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features: [none, barcode, 'barcode,text', all]
     env:
-      TURBO_CACHE_DIR: .turbo/android
+      EXPO_WORK_DIR: ${{ github.workspace }}/.tmp/expo-prebuild-${{ matrix.features }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -63,15 +72,144 @@ jobs:
       - name: Setup
         uses: ./.github/actions/setup
 
-      - name: Cache turborepo for Android
+      - name: Expo prebuild smoke test (analysisFeatures=${{ matrix.features }})
+        env:
+          DS_FEATURES: ${{ matrix.features }}
+        run: |
+          set -euo pipefail
+
+          PACKAGE_TGZ="$(npm pack --silent --ignore-scripts | tail -n1)"
+          rm -rf "$EXPO_WORK_DIR"
+          mkdir -p "$EXPO_WORK_DIR"
+
+          npx --yes create-expo-app@latest "$EXPO_WORK_DIR/app" --template blank-typescript --yes --no-install
+
+          cd "$EXPO_WORK_DIR/app"
+          npm install
+          npm install --ignore-scripts "$GITHUB_WORKSPACE/$PACKAGE_TGZ"
+
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'app.json';
+          const app = JSON.parse(fs.readFileSync(path, 'utf8'));
+          app.expo = app.expo || {};
+          app.expo.plugins = [
+            ['@preeternal/react-native-document-scanner-plugin', { analysisFeatures: process.env.DS_FEATURES }],
+          ];
+          fs.writeFileSync(path, JSON.stringify(app, null, 2) + '\n');
+          NODE
+
+          CI=1 npx expo config --json > "$EXPO_WORK_DIR/expo-config.json" 2> "$EXPO_WORK_DIR/expo-config.stderr.log" || {
+            echo "::error::expo config failed for analysisFeatures='${DS_FEATURES}'"
+            if [[ -f "$EXPO_WORK_DIR/expo-config.stderr.log" ]]; then
+              echo "::group::expo config stderr"
+              cat "$EXPO_WORK_DIR/expo-config.stderr.log"
+              echo "::endgroup::"
+            fi
+            if [[ -f "$EXPO_WORK_DIR/expo-config.json" ]]; then
+              echo "::group::expo config stdout"
+              cat "$EXPO_WORK_DIR/expo-config.json"
+              echo "::endgroup::"
+            fi
+            exit 1
+          }
+
+          node -e "JSON.parse(require(\"node:fs\").readFileSync(process.argv[1], \"utf8\"))" "$EXPO_WORK_DIR/expo-config.json" || {
+            echo "::error::expo config output is not valid JSON for analysisFeatures='${DS_FEATURES}'"
+            echo "::group::expo config stdout (raw)"
+            cat "$EXPO_WORK_DIR/expo-config.json" || true
+            echo "::endgroup::"
+            if [[ -f "$EXPO_WORK_DIR/expo-config.stderr.log" ]]; then
+              echo "::group::expo config stderr"
+              cat "$EXPO_WORK_DIR/expo-config.stderr.log"
+              echo "::endgroup::"
+            fi
+            exit 1
+          }
+
+          CI=1 npx expo prebuild --platform android --clean --no-install 2>&1 | tee "$EXPO_WORK_DIR/prebuild.log"
+
+          ACTUAL_FEATURES="$(awk -F= '/^DocumentScanner_analysisFeatures=/{print $2}' android/gradle.properties | tail -n1 | tr -d '\r')"
+          if [[ -z "$ACTUAL_FEATURES" ]]; then
+            echo "::error::Missing DocumentScanner_analysisFeatures in android/gradle.properties"
+            exit 1
+          fi
+          if [[ "$ACTUAL_FEATURES" != "$DS_FEATURES" ]]; then
+            echo "::error::DocumentScanner_analysisFeatures mismatch. expected='${DS_FEATURES}' actual='${ACTUAL_FEATURES}'"
+            exit 1
+          fi
+
+      - name: Print Expo prebuild diagnostics (${{ matrix.features }})
+        if: always()
+        run: |
+          set -euo pipefail
+
+          echo "::group::app.json"
+          if [[ -f "$EXPO_WORK_DIR/app/app.json" ]]; then
+            cat "$EXPO_WORK_DIR/app/app.json"
+          else
+            echo "Missing: $EXPO_WORK_DIR/app/app.json"
+          fi
+          echo "::endgroup::"
+
+          echo "::group::expo config"
+          if [[ -f "$EXPO_WORK_DIR/expo-config.json" ]]; then
+            cat "$EXPO_WORK_DIR/expo-config.json"
+          else
+            echo "Missing: $EXPO_WORK_DIR/expo-config.json"
+          fi
+          echo "::endgroup::"
+
+          echo "::group::android/gradle.properties (DocumentScanner lines)"
+          if [[ -f "$EXPO_WORK_DIR/app/android/gradle.properties" ]]; then
+            grep -n "DocumentScanner" "$EXPO_WORK_DIR/app/android/gradle.properties" || echo "(no DocumentScanner entries)"
+          else
+            echo "Missing: $EXPO_WORK_DIR/app/android/gradle.properties"
+          fi
+          echo "::endgroup::"
+
+      - name: Upload Expo prebuild diagnostics (${{ matrix.features }})
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: expo-prebuild-${{ matrix.features }}-diagnostics
+          if-no-files-found: warn
+          path: |
+            ${{ env.EXPO_WORK_DIR }}/prebuild.log
+            ${{ env.EXPO_WORK_DIR }}/app/app.json
+            ${{ env.EXPO_WORK_DIR }}/expo-config.json
+            ${{ env.EXPO_WORK_DIR }}/expo-config.stderr.log
+            ${{ env.EXPO_WORK_DIR }}/app/android/gradle.properties
+
+      - name: Cleanup Expo prebuild workspace (${{ matrix.features }})
+        if: always()
+        run: rm -rf "$EXPO_WORK_DIR"
+
+  build-android:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features: [none, barcode, text, all]
+    env:
+      TURBO_CACHE_DIR: .turbo/android-${{ matrix.features }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup
+        uses: ./.github/actions/setup
+
+      - name: Cache turborepo for Android (${{ matrix.features }})
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: ${{ env.TURBO_CACHE_DIR }}
-          key: ${{ runner.os }}-turborepo-android-${{ hashFiles('yarn.lock') }}
+          key: ${{ runner.os }}-turborepo-android-${{ matrix.features }}-${{ hashFiles('yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-turborepo-android-
+            ${{ runner.os }}-turborepo-android-${{ matrix.features }}-
 
-      - name: Check turborepo cache for Android
+      - name: Check turborepo cache for Android (${{ matrix.features }})
         run: |
           TURBO_CACHE_STATUS=$(node -p "($(yarn turbo run build:android --cache-dir="${{ env.TURBO_CACHE_DIR }}" --dry=json)).tasks.find(t => t.task === 'build:android').cache.status")
 
@@ -98,13 +236,15 @@ jobs:
           path: |
             ~/.gradle/wrapper
             ~/.gradle/caches
-          key: ${{ runner.os }}-gradle-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ matrix.features }}-${{ hashFiles('example/android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
+            ${{ runner.os }}-gradle-${{ matrix.features }}-
             ${{ runner.os }}-gradle-
 
-      - name: Build example for Android
+      - name: Build example for Android (features=${{ matrix.features }})
         env:
           JAVA_OPTS: "-XX:MaxHeapSize=6g"
+          ORG_GRADLE_PROJECT_DocumentScanner_analysisFeatures: ${{ matrix.features }}
         run: |
           yarn turbo run build:android --cache-dir="${{ env.TURBO_CACHE_DIR }}"
 

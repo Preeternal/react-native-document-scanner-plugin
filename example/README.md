@@ -1,97 +1,89 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Document Scanner Example App
 
-# Getting Started
+This workspace app demonstrates the full API surface of
+`@preeternal/react-native-document-scanner-plugin`.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## What this example covers
 
-## Step 1: Start Metro
+- `pickImagesFromDevice()` via `@react-native-documents/picker`
+- `pickImagesFromGallery()` via `react-native-image-picker`
+- `scanDocument(...)`
+- `extractBarcodesFromImages(...)`
+- `extractTextFromImages(...)`
+- `analyzeScannedImages(...)`
+- `scanAndAnalyzeDocument(...)`
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+You can test post-processing API without opening scanner UI:
+pick images from Files or directly from Photos and run extraction/analysis.
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+The screen also lets you interactively change:
 
-```sh
-# Using npm
-npm start
+- `responseType` (`imageFilePath` / `base64`)
+- analysis `concurrency` (`1` / `2`)
+- `ocrRotate180Fallback`
+- `extract` stage toggles (`barcodes`, `text`, `tables`, `regions`, `structuredData`)
+- barcode format allow-list
 
-# OR using Yarn
-yarn start
+## Run from repo root
+
+```bash
+yarn install
 ```
 
-## Step 2: Build and run your app
+Terminal 1:
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+```bash
+yarn example start
 ```
 
-### iOS
+Terminal 2:
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+```bash
+# Android
+yarn example android
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+# iOS
+yarn example ios
+```
 
-```sh
+## iOS setup
+
+Install pods before the first run (or after native dependency changes):
+
+```bash
+cd example/ios
 bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
 bundle exec pod install
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+After adding/updating native picker dependencies (`@react-native-documents/picker`, `react-native-image-picker`), run pod install again.
 
-```sh
-# Using npm
-npm run ios
+## Android analysis feature flags
 
-# OR using Yarn
-yarn ios
+`example/android/gradle.properties` sets:
+
+```properties
+DocumentScanner_analysisFeatures=all
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+So the example app includes all optional native analysis stages by default.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+Why this exists on Android:
 
-## Step 3: Modify your app
+- some analysis stages (barcode/OCR) require extra native dependencies;
+- opt-in flags let production apps avoid extra APK/AAB size when they only need scan-only flow.
 
-Now that you have successfully run the app, let's make changes!
+You can change this value for testing:
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+- `none` for scan-only build
+- `barcode`
+- `text`
+- `tables`
+- `all`
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+## Notes
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+- Picker mode uses native document provider URIs (`content://` / `file://`), so extraction works on existing files from device storage.
+- Gallery mode uses `react-native-image-picker` and reads images from the Photos library.
+- On Android, if a stage is not enabled in build flags, extraction methods return feature-disabled errors/status.
+- On iOS, barcode/text analysis is available without extra build flags.

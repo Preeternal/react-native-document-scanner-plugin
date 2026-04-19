@@ -33,7 +33,9 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string></string>
+	<string>Used in example app to make photos for analysis</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Used in example app to pick images from the photo library for analysis.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>UILaunchStoryboardName</key>
