@@ -99,6 +99,9 @@
   "workspaces": [
     "example"
   ],
+  "resolutions": {
+    "@react-native-documents/picker": "11.0.3"
+  },
   "packageManager": "yarn@4.9.2",
   "jest": {
     "preset": "react-native",

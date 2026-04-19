@@ -2669,7 +2669,7 @@ __metadata:
     "@react-native-community/cli": "npm:18.0.0"
     "@react-native-community/cli-platform-android": "npm:18.0.0"
     "@react-native-community/cli-platform-ios": "npm:18.0.0"
-    "@react-native-documents/picker": "npm:^11.0.3"
+    "@react-native-documents/picker": "npm:11.0.3"
     "@react-native/babel-preset": "npm:0.79.7"
     "@react-native/metro-config": "npm:0.79.7"
     "@react-native/typescript-config": "npm:0.79.7"
@@ -3061,7 +3061,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@react-native-documents/picker@npm:^11.0.3":
+"@react-native-documents/picker@npm:11.0.3":
   version: 11.0.3
   resolution: "@react-native-documents/picker@npm:11.0.3"
   peerDependencies:
