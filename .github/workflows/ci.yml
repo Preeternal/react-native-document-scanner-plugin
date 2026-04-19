@@ -302,4 +302,20 @@ jobs:
 
       - name: Build example for iOS
         run: |
-          yarn turbo run build:ios --cache-dir="${{ env.TURBO_CACHE_DIR }}"
+          set -euo pipefail
+          IOS_BUILD_LOG="$RUNNER_TEMP/ios-build.log"
+          if ! yarn turbo run build:ios --cache-dir="${{ env.TURBO_CACHE_DIR }}" 2>&1 | tee "$IOS_BUILD_LOG"; then
+            echo "::group::First iOS errors"
+            grep -nE " error: |fatal error:|Command PhaseScriptExecution failed|No such file|cannot find type " \
+              "$IOS_BUILD_LOG" | head -n 80 || true
+            echo "::endgroup::"
+            exit 1
+          fi
+
+      - name: Upload iOS build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-log
+          if-no-files-found: warn
+          path: ${{ runner.temp }}/ios-build.log
