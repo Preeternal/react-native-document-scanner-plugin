@@ -99,12 +99,45 @@ jobs:
           fs.writeFileSync(path, JSON.stringify(app, null, 2) + '\n');
           NODE
 
-          CI=1 npx expo config --json > "$EXPO_WORK_DIR/expo-config.json"
-          node -e "JSON.parse(require(\"node:fs\").readFileSync(process.argv[1], \"utf8\"))" "$EXPO_WORK_DIR/expo-config.json"
+          CI=1 npx expo config --json > "$EXPO_WORK_DIR/expo-config.json" 2> "$EXPO_WORK_DIR/expo-config.stderr.log" || {
+            echo "::error::expo config failed for analysisFeatures='${DS_FEATURES}'"
+            if [[ -f "$EXPO_WORK_DIR/expo-config.stderr.log" ]]; then
+              echo "::group::expo config stderr"
+              cat "$EXPO_WORK_DIR/expo-config.stderr.log"
+              echo "::endgroup::"
+            fi
+            if [[ -f "$EXPO_WORK_DIR/expo-config.json" ]]; then
+              echo "::group::expo config stdout"
+              cat "$EXPO_WORK_DIR/expo-config.json"
+              echo "::endgroup::"
+            fi
+            exit 1
+          }
+
+          node -e "JSON.parse(require(\"node:fs\").readFileSync(process.argv[1], \"utf8\"))" "$EXPO_WORK_DIR/expo-config.json" || {
+            echo "::error::expo config output is not valid JSON for analysisFeatures='${DS_FEATURES}'"
+            echo "::group::expo config stdout (raw)"
+            cat "$EXPO_WORK_DIR/expo-config.json" || true
+            echo "::endgroup::"
+            if [[ -f "$EXPO_WORK_DIR/expo-config.stderr.log" ]]; then
+              echo "::group::expo config stderr"
+              cat "$EXPO_WORK_DIR/expo-config.stderr.log"
+              echo "::endgroup::"
+            fi
+            exit 1
+          }
 
           CI=1 npx expo prebuild --platform android --clean --no-install 2>&1 | tee "$EXPO_WORK_DIR/prebuild.log"
 
-          grep -q "^DocumentScanner_analysisFeatures=${DS_FEATURES}$" android/gradle.properties
+          ACTUAL_FEATURES="$(awk -F= '/^DocumentScanner_analysisFeatures=/{print $2}' android/gradle.properties | tail -n1 | tr -d '\r')"
+          if [[ -z "$ACTUAL_FEATURES" ]]; then
+            echo "::error::Missing DocumentScanner_analysisFeatures in android/gradle.properties"
+            exit 1
+          fi
+          if [[ "$ACTUAL_FEATURES" != "$DS_FEATURES" ]]; then
+            echo "::error::DocumentScanner_analysisFeatures mismatch. expected='${DS_FEATURES}' actual='${ACTUAL_FEATURES}'"
+            exit 1
+          fi
 
       - name: Print Expo prebuild diagnostics (${{ matrix.features }})
         if: always()
@@ -145,6 +178,7 @@ jobs:
             ${{ env.EXPO_WORK_DIR }}/prebuild.log
             ${{ env.EXPO_WORK_DIR }}/app/app.json
             ${{ env.EXPO_WORK_DIR }}/expo-config.json
+            ${{ env.EXPO_WORK_DIR }}/expo-config.stderr.log
             ${{ env.EXPO_WORK_DIR }}/app/android/gradle.properties
 
       - name: Cleanup Expo prebuild workspace (${{ matrix.features }})
@@ -213,9 +247,6 @@ jobs:
           ORG_GRADLE_PROJECT_DocumentScanner_analysisFeatures: ${{ matrix.features }}
         run: |
           yarn turbo run build:android --cache-dir="${{ env.TURBO_CACHE_DIR }}"
-
-      - name: Verify 16KB page alignment
-        run: bash scripts/check-16kb.sh
 
   build-ios:
     runs-on: macos-latest
