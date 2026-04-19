@@ -15,6 +15,10 @@ public class DocScanner: NSObject, VNDocumentCameraViewControllerDelegate {
   private var responseType: String
   private var croppedImageQuality: Int
 
+  private func log(_ message: @autoclosure () -> String) {
+    DocScannerDebugLog.log("DocScanner", message())
+  }
+
   public init(
     _ viewController: UIViewController? = nil,
     successHandler: @escaping ([[String: Any]]) -> Void = { _ in },
@@ -37,11 +41,13 @@ public class DocScanner: NSObject, VNDocumentCameraViewControllerDelegate {
 
   public func startScan() {
     if !VNDocumentCameraViewController.isSupported {
+      log("startScan unsupported device")
       self.errorHandler("Document scanning is not supported on this device")
       return
     }
 
     DispatchQueue.main.async {
+      self.log("startScan presenting camera")
       let documentCameraViewController = VNDocumentCameraViewController()
       documentCameraViewController.delegate = self
       self.viewController?.present(documentCameraViewController, animated: true)
@@ -62,6 +68,9 @@ public class DocScanner: NSObject, VNDocumentCameraViewControllerDelegate {
     self.cancelHandler = cancelHandler
     self.responseType = responseType ?? ResponseType.imageFilePath
     self.croppedImageQuality = croppedImageQuality ?? 100
+    log(
+      "configure responseType=\(self.responseType) croppedImageQuality=\(self.croppedImageQuality)"
+    )
 
     self.startScan()
   }
@@ -71,33 +80,45 @@ public class DocScanner: NSObject, VNDocumentCameraViewControllerDelegate {
     didFinishWith scan: VNDocumentCameraScan
   ) {
     var processedResults: [[String: Any]] = []
+    log(
+      "didFinishWith pageCount=\(scan.pageCount) responseType=\(responseType) quality=\(croppedImageQuality)"
+    )
 
     for pageNumber in 0 ..< scan.pageCount {
       let scannedImage: UIImage = scan.imageOfPage(at: pageNumber)
+      log(
+        "page[\(pageNumber)] source size=\(Int(scannedImage.size.width))x\(Int(scannedImage.size.height)) scale=\(scannedImage.scale)"
+      )
 
       guard let scannedDocumentImage: Data = scannedImage
         .jpegData(compressionQuality: CGFloat(self.croppedImageQuality) / CGFloat(100)) else {
         goBackToPreviousView(controller)
+        log("page[\(pageNumber)] jpeg encode failed")
         self.errorHandler("Unable to get scanned document in jpeg format")
         return
       }
+      log("page[\(pageNumber)] jpeg bytes=\(scannedDocumentImage.count)")
 
       let imageIdentifier: String
       switch responseType {
       case ResponseType.base64:
         imageIdentifier = scannedDocumentImage.base64EncodedString()
+        log("page[\(pageNumber)] encoded as base64 length=\(imageIdentifier.count)")
       case ResponseType.imageFilePath:
         do {
           let croppedImageFilePath = FileUtil().createImageFile(pageNumber)
           try scannedDocumentImage.write(to: croppedImageFilePath)
           imageIdentifier = croppedImageFilePath.absoluteString
+          log("page[\(pageNumber)] saved file=\(croppedImageFilePath.lastPathComponent)")
         } catch {
           goBackToPreviousView(controller)
+          log("page[\(pageNumber)] save failed error=\(error.localizedDescription)")
           self.errorHandler("Unable to save scanned image: \(error.localizedDescription)")
           return
         }
       default:
         goBackToPreviousView(controller)
+        log("page[\(pageNumber)] invalid responseType=\(responseType)")
         self.errorHandler("responseType must be base64 or imageFilePath")
         return
       }
@@ -108,6 +129,7 @@ public class DocScanner: NSObject, VNDocumentCameraViewControllerDelegate {
     }
 
     goBackToPreviousView(controller)
+    log("didFinishWith resolved pages=\(processedResults.count)")
     self.successHandler(processedResults)
   }
 
@@ -115,6 +137,7 @@ public class DocScanner: NSObject, VNDocumentCameraViewControllerDelegate {
     _ controller: VNDocumentCameraViewController
   ) {
     goBackToPreviousView(controller)
+    log("documentCameraViewControllerDidCancel")
     self.cancelHandler()
   }
 
@@ -123,6 +146,7 @@ public class DocScanner: NSObject, VNDocumentCameraViewControllerDelegate {
     didFailWithError error: Error
   ) {
     goBackToPreviousView(controller)
+    log("documentCameraViewController didFailWithError=\(error.localizedDescription)")
     self.errorHandler(error.localizedDescription)
   }
 

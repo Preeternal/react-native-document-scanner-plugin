@@ -17,8 +17,9 @@ enum TextExtractor {
     sourceImageIndex: Int,
     enableRotate180Fallback: Bool = false
   ) -> [AnalysisTextBlock] {
+    let preparedImage = image.normalizedForVision()
     let firstPass = extractSinglePass(
-      image,
+      preparedImage,
       sourceImageIndex: sourceImageIndex
     )
 
@@ -28,7 +29,7 @@ enum TextExtractor {
     guard shouldRunRotateFallback(firstPass) else {
       return firstPass
     }
-    guard let rotated = rotate180(image) else {
+    guard let rotated = rotate180(preparedImage) else {
       return firstPass
     }
 

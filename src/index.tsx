@@ -35,6 +35,8 @@ type NativeAnalyzeFn = (options: {
   extractStructuredData?: boolean;
   barcodeFormats?: AnalyzeScannedImagesOptions['barcodeFormats'];
   concurrency?: AnalyzeScannedImagesOptions['concurrency'];
+  barcodeTimeoutMs?: AnalyzeScannedImagesOptions['barcodeTimeoutMs'];
+  textTimeoutMs?: AnalyzeScannedImagesOptions['textTimeoutMs'];
   ocrRotate180Fallback?: boolean;
 }) => Promise<AnalysisResult>;
 
@@ -61,6 +63,7 @@ function normalizeBarcodeOptions(
 ): ExtractBarcodesFromImagesOptions {
   return {
     barcodeFormats: options.barcodeFormats,
+    barcodeTimeoutMs: options.barcodeTimeoutMs,
     concurrency:
       options.concurrency ??
       clampAnalysisConcurrency(DEFAULT_ANALYSIS_CONCURRENCY),
@@ -76,6 +79,7 @@ function normalizeTextOptions(
 ): ExtractTextFromImagesOptions {
   return {
     ocrRotate180Fallback: options.ocrRotate180Fallback ?? false,
+    textTimeoutMs: options.textTimeoutMs,
     concurrency:
       options.concurrency ??
       clampAnalysisConcurrency(DEFAULT_ANALYSIS_CONCURRENCY),
@@ -103,6 +107,7 @@ export function extractBarcodesFromImages(
   return DocumentScanner.extractBarcodesFromImages({
     images,
     barcodeFormats: normalizedOptions.barcodeFormats,
+    barcodeTimeoutMs: normalizedOptions.barcodeTimeoutMs,
     concurrency: normalizedOptions.concurrency,
   });
 }
@@ -119,6 +124,7 @@ export function extractTextFromImages(
   return DocumentScanner.extractTextFromImages({
     images,
     concurrency: normalizedOptions.concurrency,
+    textTimeoutMs: normalizedOptions.textTimeoutMs,
     ocrRotate180Fallback: normalizedOptions.ocrRotate180Fallback,
   });
 }
@@ -186,6 +192,7 @@ async function runBarcodeStage(
     const value = await extractBarcodesFromImages(images, {
       barcodeFormats: options.barcodeFormats,
       concurrency: options.concurrency,
+      barcodeTimeoutMs: options.barcodeTimeoutMs,
     });
     return {
       status: 'success',
@@ -218,6 +225,7 @@ async function runTextStage(
   try {
     const value = await extractTextFromImages(images, {
       concurrency: options.concurrency,
+      textTimeoutMs: options.textTimeoutMs,
       ocrRotate180Fallback,
     });
     return {
@@ -266,6 +274,8 @@ export async function analyzeScannedImages(
         extractStructuredData: wantsStructuredData,
         barcodeFormats: options.barcodeFormats,
         concurrency: options.concurrency,
+        barcodeTimeoutMs: options.barcodeTimeoutMs,
+        textTimeoutMs: options.textTimeoutMs,
         ocrRotate180Fallback,
       });
     } catch (_error) {

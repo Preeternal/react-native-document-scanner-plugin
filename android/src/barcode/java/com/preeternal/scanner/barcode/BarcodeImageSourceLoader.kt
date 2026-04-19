@@ -7,39 +7,63 @@ import android.graphics.Matrix
 import android.net.Uri
 import android.util.Base64
 import androidx.exifinterface.media.ExifInterface
+import com.preeternal.scanner.DocScannerDebugLog
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
 
 internal object BarcodeImageSourceLoader {
+  private const val TAG = "DocumentScannerBarcode"
   private const val MAX_DECODE_DIMENSION = 2048
   private val base64Regex = Regex("^[A-Za-z0-9+/=\\s]+$")
+
+  private fun logDebug(message: String) {
+    DocScannerDebugLog.debug(TAG, message)
+  }
+
+  private fun logWarn(message: String) {
+    DocScannerDebugLog.warn(TAG, message)
+  }
 
   fun loadBitmap(context: Context, imageSource: String): Bitmap? {
     val normalized = imageSource.trim()
     if (normalized.isEmpty()) {
+      logDebug("loadBitmap empty source")
       return null
     }
+    logDebug(
+      "loadBitmap start length=${normalized.length} scheme=${Uri.parse(normalized).scheme ?: "path-or-base64"}"
+    )
 
     if (normalized.startsWith("data:", ignoreCase = true) && normalized.contains("base64,")) {
       val payload = normalized.substringAfter("base64,", "")
-      return decodeFromBase64(payload)
+      return decodeFromBase64(payload)?.also {
+        logDebug("loadBitmap decoded data: base64 size=${it.width}x${it.height}")
+      }
     }
 
     if (normalized.startsWith("content://", ignoreCase = true)) {
-      return loadFromUri(context, Uri.parse(normalized))
+      return loadFromUri(context, Uri.parse(normalized))?.also {
+        logDebug("loadBitmap decoded content:// size=${it.width}x${it.height}")
+      }
     }
 
     if (normalized.startsWith("file://", ignoreCase = true)) {
-      return loadFromFilePath(resolveFilePathFromUri(Uri.parse(normalized)))
+      return loadFromFilePath(resolveFilePathFromUri(Uri.parse(normalized)))?.also {
+        logDebug("loadBitmap decoded file:// size=${it.width}x${it.height}")
+      }
     }
 
     if (File(normalized).exists()) {
-      return loadFromFilePath(normalized)
+      return loadFromFilePath(normalized)?.also {
+        logDebug("loadBitmap decoded path size=${it.width}x${it.height}")
+      }
     }
 
     if (looksLikeBase64(normalized)) {
-      return decodeFromBase64(normalized)
+      return decodeFromBase64(normalized)?.also {
+        logDebug("loadBitmap decoded plain-base64 size=${it.width}x${it.height}")
+      }
     }
 
     val parsed = Uri.parse(normalized)
@@ -48,6 +72,8 @@ internal object BarcodeImageSourceLoader {
       "file" -> loadFromFilePath(resolveFilePathFromUri(parsed))
       null, "" -> loadFromFilePath(normalized)
       else -> loadFromUri(context, parsed)
+    }?.also {
+      logDebug("loadBitmap decoded fallback size=${it.width}x${it.height}")
     }
   }
 
@@ -56,6 +82,7 @@ internal object BarcodeImageSourceLoader {
       val decoded = Base64.decode(payload, Base64.DEFAULT)
       decodeSampledBitmap(decoded)
     } catch (_: IllegalArgumentException) {
+      logWarn("decodeFromBase64 failed")
       null
     }
   }
@@ -70,6 +97,7 @@ internal object BarcodeImageSourceLoader {
 
       rotateBitmapIfRequired(bitmap, orientation)
     } catch (_: Exception) {
+      logWarn("loadFromUri failed uri=$uri")
       null
     }
   }
@@ -89,6 +117,7 @@ internal object BarcodeImageSourceLoader {
 
     val file = File(candidatePath)
     if (!file.exists() || !file.isFile) {
+      logDebug("loadFromFilePath missing file path=$candidatePath")
       return null
     }
 
@@ -100,6 +129,7 @@ internal object BarcodeImageSourceLoader {
 
       rotateBitmapIfRequired(bitmap, orientation)
     } catch (_: Exception) {
+      logWarn("loadFromFilePath failed path=$candidatePath")
       null
     }
   }
@@ -120,6 +150,7 @@ internal object BarcodeImageSourceLoader {
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
 
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+      logDebug("decodeSampledBitmap invalid bounds")
       return null
     }
 
@@ -170,6 +201,7 @@ internal object BarcodeImageSourceLoader {
     return try {
       Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
     } catch (_: Exception) {
+      logWarn("rotateBitmap failed angle=$angle")
       null
     }
   }

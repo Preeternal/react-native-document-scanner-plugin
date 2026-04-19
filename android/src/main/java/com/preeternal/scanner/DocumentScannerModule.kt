@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.util.Base64
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
@@ -65,6 +64,8 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     private const val ANDROID_15_API = 35
     private const val BARCODE_EXTRACTION_TIMEOUT_MS = 10_000L
     private const val TEXT_EXTRACTION_TIMEOUT_MS = 25_000L
+    private const val MIN_EXTRACTION_TIMEOUT_MS = 1_000L
+    private const val MAX_EXTRACTION_TIMEOUT_MS = 120_000L
   }
 
   override fun getName(): String = NAME
@@ -86,6 +87,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
   )
 
   private var launcher: ActivityResultLauncher<IntentSenderRequest>? = null
+  private val launcherInitLock = Any()
   private var pendingPromise: Promise? = null
   private var pendingOptions: ReadableMap? = null
   private var pendingQuality: Int = 100
@@ -94,7 +96,16 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
   private var hostActivityRef: WeakReference<ComponentActivity>? = null
   private var previousFitsSystemWindows: Boolean? = null
 
+  private fun logDebug(message: String) {
+    DocScannerDebugLog.debug(NAME, message)
+  }
+
+  private fun logWarn(message: String) {
+    DocScannerDebugLog.warn(NAME, message)
+  }
+
   override fun scanDocument(options: ReadableMap, promise: Promise) {
+    logDebug("scanDocument invoked")
     val activity = currentActivity
     if (activity == null) {
       promise.reject("no_activity", "Activity not available")
@@ -113,6 +124,9 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     pendingPromise = promise
     pendingOptions = options
     pendingQuality = if (options.hasKey("croppedImageQuality")) options.getInt("croppedImageQuality") else 100
+    logDebug(
+      "scanDocument options responseType=${getStringOrNull(options, "responseType") ?: "default"} croppedImageQuality=$pendingQuality"
+    )
 
     hostActivityRef = WeakReference(componentActivity)
     ensureSystemBarsVisible(componentActivity)
@@ -123,8 +137,10 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
   }
 
   override fun extractBarcodesFromImages(options: ReadableMap, promise: Promise) {
+    logDebug("extractBarcodesFromImages invoked")
     val images = getArrayOrNull(options, "images")
     if (images == null || images.size() == 0) {
+      logDebug("extractBarcodesFromImages no images, resolve []")
       promise.resolve(WritableNativeArray())
       return
     }
@@ -140,9 +156,17 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     val allowedFormats = parseAllowedFormats(getArrayOrNull(options, "barcodeFormats"))
     val requestedConcurrency = getIntOrNull(options, "concurrency") ?: 2
     val concurrency = requestedConcurrency.coerceIn(1, 2)
+    val timeoutMs = resolveTimeoutMs(
+      getIntOrNull(options, "barcodeTimeoutMs"),
+      BARCODE_EXTRACTION_TIMEOUT_MS
+    )
     val validSources = buildValidImageSources(images)
+    logDebug(
+      "extractBarcodesFromImages images=${images.size()} validSources=${validSources.size} concurrency=$concurrency timeoutMs=$timeoutMs allowedFormats=${allowedFormats.sorted()}"
+    )
 
     if (validSources.isEmpty()) {
+      logDebug("extractBarcodesFromImages no valid sources, resolve []")
       promise.resolve(WritableNativeArray())
       return
     }
@@ -153,22 +177,28 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
           context = reactApplicationContext,
           sources = validSources,
           allowedFormats = allowedFormats,
-          concurrency = concurrency
+          concurrency = concurrency,
+          timeoutMs = timeoutMs
         )
 
         val payload = toWritableBarcodeArray(extracted)
+        logDebug("extractBarcodesFromImages resolved barcodes=${extracted.size}")
         resolveOnUi(promise, payload)
       } catch (cancelled: CancellationException) {
+        logWarn("extractBarcodesFromImages cancelled: ${cancelled.message}")
         rejectOnUi(promise, "barcode_extraction_cancelled", "Barcode extraction cancelled", cancelled)
       } catch (error: Exception) {
+        logWarn("extractBarcodesFromImages error: ${error.message}")
         rejectOnUi(promise, "barcode_extraction_error", error.message ?: "Barcode extraction failed", error)
       }
     }
   }
 
   override fun extractTextFromImages(options: ReadableMap, promise: Promise) {
+    logDebug("extractTextFromImages invoked")
     val images = getArrayOrNull(options, "images")
     if (images == null || images.size() == 0) {
+      logDebug("extractTextFromImages no images, resolve []")
       promise.resolve(WritableNativeArray())
       return
     }
@@ -184,9 +214,17 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     val requestedConcurrency = getIntOrNull(options, "concurrency") ?: 2
     val concurrency = requestedConcurrency.coerceIn(1, 2)
     val ocrRotate180Fallback = getBooleanOrNull(options, "ocrRotate180Fallback") ?: false
+    val timeoutMs = resolveTimeoutMs(
+      getIntOrNull(options, "textTimeoutMs"),
+      TEXT_EXTRACTION_TIMEOUT_MS
+    )
     val validSources = buildValidImageSources(images)
+    logDebug(
+      "extractTextFromImages images=${images.size()} validSources=${validSources.size} concurrency=$concurrency timeoutMs=$timeoutMs rotate180=$ocrRotate180Fallback"
+    )
 
     if (validSources.isEmpty()) {
+      logDebug("extractTextFromImages no valid sources, resolve []")
       promise.resolve(WritableNativeArray())
       return
     }
@@ -197,24 +235,30 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
           context = reactApplicationContext,
           sources = validSources,
           concurrency = concurrency,
+          timeoutMs = timeoutMs,
           ocrRotate180Fallback = ocrRotate180Fallback
         )
 
         val payload = toWritableTextBlockArray(extracted)
+        logDebug("extractTextFromImages resolved textBlocks=${extracted.size}")
         resolveOnUi(promise, payload)
       } catch (cancelled: CancellationException) {
+        logWarn("extractTextFromImages cancelled: ${cancelled.message}")
         rejectOnUi(promise, "text_extraction_cancelled", "Text extraction cancelled", cancelled)
       } catch (error: Exception) {
+        logWarn("extractTextFromImages error: ${error.message}")
         rejectOnUi(promise, "text_extraction_error", error.message ?: "Text extraction failed", error)
       }
     }
   }
 
   override fun analyzeScannedImages(options: ReadableMap, promise: Promise) {
+    logDebug("analyzeScannedImages invoked")
     val images = getArrayOrNull(options, "images")
     if (images == null || images.size() == 0) {
       val empty = WritableNativeMap()
       empty.putString("status", "success")
+      logDebug("analyzeScannedImages no images, resolve success")
       promise.resolve(empty)
       return
     }
@@ -225,10 +269,14 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     val wantsRegions = getBooleanOrNull(options, "extractRegions") ?: false
     val wantsStructuredData = getBooleanOrNull(options, "extractStructuredData") ?: false
     val wantsTextPipeline = wantsText || wantsTables || wantsRegions || wantsStructuredData
+    logDebug(
+      "analyzeScannedImages flags barcodes=$wantsBarcodes text=$wantsText tables=$wantsTables regions=$wantsRegions structured=$wantsStructuredData"
+    )
 
     if (!wantsBarcodes && !wantsTextPipeline) {
       val empty = WritableNativeMap()
       empty.putString("status", "success")
+      logDebug("analyzeScannedImages nothing requested, resolve success")
       promise.resolve(empty)
       return
     }
@@ -236,12 +284,24 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     val allowedFormats = parseAllowedFormats(getArrayOrNull(options, "barcodeFormats"))
     val requestedConcurrency = getIntOrNull(options, "concurrency") ?: 2
     val concurrency = requestedConcurrency.coerceIn(1, 2)
-    val ocrRotate180Fallback = getBooleanOrNull(options, "ocrRotate180Fallback") ?: false
+    val ocrRotate180Fallback = getBooleanOrNull(options, "ocrRotate180Fallback") ?: true
+    val barcodeTimeoutMs = resolveTimeoutMs(
+      getIntOrNull(options, "barcodeTimeoutMs"),
+      BARCODE_EXTRACTION_TIMEOUT_MS
+    )
+    val textTimeoutMs = resolveTimeoutMs(
+      getIntOrNull(options, "textTimeoutMs"),
+      TEXT_EXTRACTION_TIMEOUT_MS
+    )
     val validSources = buildValidImageSources(images)
+    logDebug(
+      "analyzeScannedImages images=${images.size()} validSources=${validSources.size} concurrency=$concurrency barcodeTimeoutMs=$barcodeTimeoutMs textTimeoutMs=$textTimeoutMs rotate180=$ocrRotate180Fallback allowedFormats=${allowedFormats.sorted()}"
+    )
 
     if (validSources.isEmpty()) {
       val empty = WritableNativeMap()
       empty.putString("status", "success")
+      logDebug("analyzeScannedImages no valid sources, resolve success")
       promise.resolve(empty)
       return
     }
@@ -254,7 +314,8 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
               wantsStage = wantsBarcodes,
               sources = validSources,
               allowedFormats = allowedFormats,
-              concurrency = concurrency
+              concurrency = concurrency,
+              timeoutMs = barcodeTimeoutMs
             )
           }
 
@@ -263,6 +324,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
               wantsStage = wantsTextPipeline,
               sources = validSources,
               concurrency = concurrency,
+              timeoutMs = textTimeoutMs,
               ocrRotate180Fallback = ocrRotate180Fallback
             )
           }
@@ -274,6 +336,9 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
         result.putString(
           "status",
           mergeAnalysisStageStatuses(listOf(barcodeStage.status, textStage.status))
+        )
+        logDebug(
+          "analyzeScannedImages stage status barcode=${barcodeStage.status} text=${textStage.status}"
         )
 
         if (barcodeStage.status == AnalysisStageStatus.SUCCESS) {
@@ -314,9 +379,14 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
         }
 
         resolveOnUi(promise, result)
+        logDebug(
+          "analyzeScannedImages resolved status=${result.getString("status")} barcodes=${if (barcodeStage.status == AnalysisStageStatus.SUCCESS) (barcodeStage.value ?: emptyList()).size else 0} textBlocks=${textBlocks.size}"
+        )
       } catch (cancelled: CancellationException) {
+        logWarn("analyzeScannedImages cancelled: ${cancelled.message}")
         rejectOnUi(promise, "analysis_cancelled", "Image analysis cancelled", cancelled)
       } catch (error: Exception) {
+        logWarn("analyzeScannedImages error: ${error.message}")
         rejectOnUi(promise, "analysis_error", error.message ?: "Image analysis failed", error)
       }
     }
@@ -334,43 +404,45 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
   }
 
   private fun initLauncher(activity: ComponentActivity) {
-    if (launcher != null) return
-    launcher = activity.activityResultRegistry.register(
-      "document-scanner",
-      ActivityResultContracts.StartIntentSenderForResult()
-    ) { result ->
-      val promise = pendingPromise ?: return@register
-      val options = pendingOptions
-      val response = WritableNativeMap()
-      val images = WritableNativeArray()
+    synchronized(launcherInitLock) {
+      if (launcher != null) return
+      launcher = activity.activityResultRegistry.register(
+        "document-scanner",
+        ActivityResultContracts.StartIntentSenderForResult()
+      ) { result ->
+        val promise = pendingPromise ?: return@register
+        val options = pendingOptions
+        val response = WritableNativeMap()
+        val images = WritableNativeArray()
 
-      if (result.resultCode == Activity.RESULT_OK) {
-        val docResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
-        val pages = docResult?.pages.orEmpty()
-        val responseType = options?.getString("responseType")?.lowercase()
+        if (result.resultCode == Activity.RESULT_OK) {
+          val docResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
+          val pages = docResult?.pages.orEmpty()
+          val responseType = options?.getString("responseType")?.lowercase()
 
-        processPages(
-          activity = activity,
-          pages = pages,
-          pageIndex = 0,
-          responseType = responseType,
-          images = images,
-          onError = { errorMessage ->
-            promise.reject("document_scan_error", errorMessage, null)
-            clearPending()
-          },
-          onComplete = {
-            response.putString("status", "success")
-            response.putArray("scannedImages", images)
-            promise.resolve(response)
-            clearPending()
-          }
-        )
-      } else {
-        response.putString("status", "cancel")
-        response.putArray("scannedImages", images)
-        promise.resolve(response)
-        clearPending()
+          processPages(
+            activity = activity,
+            pages = pages,
+            pageIndex = 0,
+            responseType = responseType,
+            images = images,
+            onError = { errorMessage ->
+              promise.reject("document_scan_error", errorMessage, null)
+              clearPending()
+            },
+            onComplete = {
+              response.putString("status", "success")
+              response.putArray("scannedImages", images)
+              promise.resolve(response)
+              clearPending()
+            }
+          )
+        } else {
+          response.putString("status", "cancel")
+          response.putArray("scannedImages", images)
+          promise.resolve(response)
+          clearPending()
+        }
       }
     }
   }
@@ -384,43 +456,23 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     onError: (String) -> Unit,
     onComplete: () -> Unit
   ) {
-    if (pageIndex >= pages.size) {
-      onComplete()
-      return
+    var currentIndex = pageIndex
+    while (currentIndex < pages.size) {
+      val uri = pages[currentIndex].imageUri
+      val outputImage = try {
+        mapOutputImage(activity, uri, responseType)
+      } catch (e: FileNotFoundException) {
+        onError(e.message ?: "Unable to read scanned image")
+        return
+      }
+
+      if (!outputImage.isNullOrBlank()) {
+        images.pushString(outputImage)
+      }
+      currentIndex += 1
     }
 
-    val uri = pages[pageIndex].imageUri
-
-    val outputImage = try {
-      mapOutputImage(activity, uri, responseType)
-    } catch (e: FileNotFoundException) {
-      onError(e.message ?: "Unable to read scanned image")
-      return
-    }
-
-    if (outputImage == null || outputImage.isBlank()) {
-      processPages(
-        activity = activity,
-        pages = pages,
-        pageIndex = pageIndex + 1,
-        responseType = responseType,
-        images = images,
-        onError = onError,
-        onComplete = onComplete
-      )
-      return
-    }
-
-    images.pushString(outputImage)
-    processPages(
-      activity = activity,
-      pages = pages,
-      pageIndex = pageIndex + 1,
-      responseType = responseType,
-      images = images,
-      onError = onError,
-      onComplete = onComplete
-    )
+    onComplete()
   }
 
   private fun mapOutputImage(
@@ -504,8 +556,11 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
             imageSource = imageSource
           )
         )
+      } else {
+        logDebug("buildValidImageSources skip source[$index] empty or invalid")
       }
     }
+    logDebug("buildValidImageSources mapped=${validSources.size} from raw=${images.size()}")
     return validSources
   }
 
@@ -513,8 +568,12 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     context: ReactApplicationContext,
     sources: List<IndexedImageSource>,
     allowedFormats: Set<String>,
-    concurrency: Int
+    concurrency: Int,
+    timeoutMs: Long
   ): List<BarcodeResult> = coroutineScope {
+    logDebug(
+      "extractBarcodesInParallel start sources=${sources.size} concurrency=$concurrency allowedFormats=${allowedFormats.sorted()}"
+    )
     val limiter = Semaphore(concurrency)
 
     val tasks = sources.map { source ->
@@ -524,22 +583,29 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
             context = context,
             imageSource = source.imageSource,
             sourceImageIndex = source.sourceImageIndex,
-            allowedFormats = allowedFormats
+            allowedFormats = allowedFormats,
+            timeoutMs = timeoutMs
           )
         }
       }
     }
 
-    tasks.awaitAll().flatten()
+    val merged = tasks.awaitAll().flatten()
+    logDebug("extractBarcodesInParallel completed total=${merged.size}")
+    merged
   }
 
   private suspend fun extractBarcodesForSource(
     context: ReactApplicationContext,
     imageSource: String,
     sourceImageIndex: Int,
-    allowedFormats: Set<String>
+    allowedFormats: Set<String>,
+    timeoutMs: Long
   ): List<BarcodeResult> {
-    val detected = withTimeoutOrNull(BARCODE_EXTRACTION_TIMEOUT_MS) {
+    logDebug(
+      "extractBarcodesForSource start index=$sourceImageIndex sourceLength=${imageSource.length} allowedFormats=${allowedFormats.sorted()}"
+    )
+    val detected = withTimeoutOrNull(timeoutMs) {
       suspendCancellableCoroutine { continuation ->
         barcodeExtractor.extractFromSource(
           context = context,
@@ -555,13 +621,13 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     }
 
     if (detected == null) {
-      Log.w(
-        NAME,
-        "Barcode extraction timed out after ${BARCODE_EXTRACTION_TIMEOUT_MS}ms for sourceImageIndex=$sourceImageIndex"
+      logWarn(
+        "Barcode extraction timed out after ${timeoutMs}ms for sourceImageIndex=$sourceImageIndex"
       )
       return emptyList()
     }
 
+    logDebug("extractBarcodesForSource completed index=$sourceImageIndex detected=${detected.size}")
     return detected
   }
 
@@ -569,8 +635,12 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     context: ReactApplicationContext,
     sources: List<IndexedImageSource>,
     concurrency: Int,
+    timeoutMs: Long,
     ocrRotate180Fallback: Boolean
   ): List<TextBlockResult> = coroutineScope {
+    logDebug(
+      "extractTextInParallel start sources=${sources.size} concurrency=$concurrency rotate180=$ocrRotate180Fallback"
+    )
     val limiter = Semaphore(concurrency)
 
     val tasks = sources.map { source ->
@@ -580,22 +650,29 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
             context = context,
             imageSource = source.imageSource,
             sourceImageIndex = source.sourceImageIndex,
+            timeoutMs = timeoutMs,
             ocrRotate180Fallback = ocrRotate180Fallback
           )
         }
       }
     }
 
-    tasks.awaitAll().flatten()
+    val merged = tasks.awaitAll().flatten()
+    logDebug("extractTextInParallel completed total=${merged.size}")
+    merged
   }
 
   private suspend fun extractTextForSource(
     context: ReactApplicationContext,
     imageSource: String,
     sourceImageIndex: Int,
+    timeoutMs: Long,
     ocrRotate180Fallback: Boolean
   ): List<TextBlockResult> {
-    return withTimeoutOrNull(TEXT_EXTRACTION_TIMEOUT_MS) {
+    logDebug(
+      "extractTextForSource start index=$sourceImageIndex sourceLength=${imageSource.length} rotate180=$ocrRotate180Fallback"
+    )
+    val detected = withTimeoutOrNull(timeoutMs) {
       suspendCancellableCoroutine { continuation ->
         textExtractor.extractFromSource(
           context = context,
@@ -608,19 +685,32 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
           }
         }
       }
-    } ?: emptyList()
+    }
+
+    if (detected == null) {
+      logWarn(
+        "Text extraction timed out after ${timeoutMs}ms for sourceImageIndex=$sourceImageIndex"
+      )
+      return emptyList()
+    }
+
+    logDebug("extractTextForSource completed index=$sourceImageIndex detected=${detected.size}")
+    return detected
   }
 
   private suspend fun runBarcodeAnalysisStage(
     wantsStage: Boolean,
     sources: List<IndexedImageSource>,
     allowedFormats: Set<String>,
-    concurrency: Int
+    concurrency: Int,
+    timeoutMs: Long
   ): AnalysisStageResult<List<BarcodeResult>> {
     if (!wantsStage) {
+      logDebug("runBarcodeAnalysisStage skipped")
       return AnalysisStageResult(AnalysisStageStatus.SKIPPED)
     }
     if (!barcodeExtractor.isFeatureEnabled()) {
+      logDebug("runBarcodeAnalysisStage not enabled")
       return AnalysisStageResult(AnalysisStageStatus.NOT_ENABLED)
     }
 
@@ -629,13 +719,15 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
         context = reactApplicationContext,
         sources = sources,
         allowedFormats = allowedFormats,
-        concurrency = concurrency
+        concurrency = concurrency,
+        timeoutMs = timeoutMs
       )
       AnalysisStageResult(
         status = AnalysisStageStatus.SUCCESS,
         value = value
       )
-    } catch (_: Exception) {
+    } catch (error: Exception) {
+      logWarn("runBarcodeAnalysisStage failed: ${error.message}")
       AnalysisStageResult(AnalysisStageStatus.FAILED)
     }
   }
@@ -644,12 +736,15 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     wantsStage: Boolean,
     sources: List<IndexedImageSource>,
     concurrency: Int,
+    timeoutMs: Long,
     ocrRotate180Fallback: Boolean
   ): AnalysisStageResult<List<TextBlockResult>> {
     if (!wantsStage) {
+      logDebug("runTextAnalysisStage skipped")
       return AnalysisStageResult(AnalysisStageStatus.SKIPPED)
     }
     if (!textExtractor.isFeatureEnabled()) {
+      logDebug("runTextAnalysisStage not enabled")
       return AnalysisStageResult(AnalysisStageStatus.NOT_ENABLED)
     }
 
@@ -658,13 +753,15 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
         context = reactApplicationContext,
         sources = sources,
         concurrency = concurrency,
+        timeoutMs = timeoutMs,
         ocrRotate180Fallback = ocrRotate180Fallback
       )
       AnalysisStageResult(
         status = AnalysisStageStatus.SUCCESS,
         value = value
       )
-    } catch (_: Exception) {
+    } catch (error: Exception) {
+      logWarn("runTextAnalysisStage failed: ${error.message}")
       AnalysisStageResult(AnalysisStageStatus.FAILED)
     }
   }
@@ -893,12 +990,29 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
     }
   }
 
+  private fun resolveTimeoutMs(rawValue: Int?, fallback: Long): Long {
+    val candidate = rawValue?.toLong() ?: fallback
+    return candidate.coerceIn(MIN_EXTRACTION_TIMEOUT_MS, MAX_EXTRACTION_TIMEOUT_MS)
+  }
+
   private fun getBooleanOrNull(map: ReadableMap, key: String): Boolean? {
     return try {
       if (!map.hasKey(key) || map.isNull(key)) {
         null
       } else {
         map.getBoolean(key)
+      }
+    } catch (_: Exception) {
+      null
+    }
+  }
+
+  private fun getStringOrNull(map: ReadableMap, key: String): String? {
+    return try {
+      if (!map.hasKey(key) || map.isNull(key)) {
+        null
+      } else {
+        map.getString(key)
       }
     } catch (_: Exception) {
       null
@@ -947,6 +1061,11 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
 
   override fun invalidate() {
     super.invalidate()
+    launcher?.unregister()
+    launcher = null
+    scanner = null
+    barcodeExtractor.release()
+    clearPending()
     scope.cancel()
   }
 

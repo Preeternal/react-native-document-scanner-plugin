@@ -5,6 +5,10 @@ import Vision
 
 @available(iOS 26.0, *)
 enum RecognizeDocumentsAnalyzer {
+  private static func log(_ message: @autoclosure () -> String) {
+    DocScannerDebugLog.log("RecognizeDocumentsAnalyzer", message())
+  }
+
   struct Options {
     let includeBarcodes: Bool
     let includeText: Bool
@@ -27,6 +31,9 @@ enum RecognizeDocumentsAnalyzer {
     sourceImageIndex: Int,
     options: Options
   ) -> PageAnalysis {
+    log(
+      "analyzeImageBlocking start sourceImageIndex=\(sourceImageIndex) include(barcodes=\(options.includeBarcodes), text=\(options.includeText), tables=\(options.includeTables), regions=\(options.includeRegions), structured=\(options.includeStructuredData)) allowedFormats=\(options.allowedBarcodeFormats)"
+    )
     let semaphore = DispatchSemaphore(value: 0)
     var output = PageAnalysis(
       barcodes: [],
@@ -46,6 +53,9 @@ enum RecognizeDocumentsAnalyzer {
     }
 
     semaphore.wait()
+    log(
+      "analyzeImageBlocking done sourceImageIndex=\(sourceImageIndex) barcodes=\(output.barcodes.count) textBlocks=\(output.textBlocks.count) tables=\(output.tables.count) regions=\(output.regions.count)"
+    )
     return output
   }
 
@@ -54,7 +64,12 @@ enum RecognizeDocumentsAnalyzer {
     sourceImageIndex: Int,
     options: Options
   ) async -> PageAnalysis {
-    guard let cgImage = image.cgImage else {
+    let preparedImage = image.normalizedForVision()
+    log(
+      "analyzeImage start sourceImageIndex=\(sourceImageIndex) image=\(Int(preparedImage.size.width))x\(Int(preparedImage.size.height))"
+    )
+    guard let cgImage = preparedImage.cgImage else {
+      log("analyzeImage sourceImageIndex=\(sourceImageIndex) missing cgImage")
       return PageAnalysis(
         barcodes: [],
         textBlocks: [],
@@ -75,6 +90,9 @@ enum RecognizeDocumentsAnalyzer {
     if !allowedSymbologies.isEmpty {
       barcodeOptions.symbologies = allowedSymbologies
     }
+    log(
+      "analyzeImage sourceImageIndex=\(sourceImageIndex) allowedFormatsNormalized=\(Array(allowedFormats).sorted()) allowedSymbologies=\(allowedSymbologies)"
+    )
     request.barcodeDetectionOptions = barcodeOptions
 
     let handler = ImageRequestHandler(cgImage)
@@ -83,6 +101,7 @@ enum RecognizeDocumentsAnalyzer {
     do {
       observations = try await handler.perform(request)
     } catch {
+      log("analyzeImage sourceImageIndex=\(sourceImageIndex) request failed error=\(error.localizedDescription)")
       return PageAnalysis(
         barcodes: [],
         textBlocks: [],
@@ -91,6 +110,7 @@ enum RecognizeDocumentsAnalyzer {
         structuredData: AnalysisStructuredData(entities: [], fields: [:])
       )
     }
+    log("analyzeImage sourceImageIndex=\(sourceImageIndex) observations=\(observations.count)")
 
     var textBlocks: [AnalysisTextBlock] = []
     var tables: [AnalysisTable] = []
@@ -100,6 +120,7 @@ enum RecognizeDocumentsAnalyzer {
     var dedupEntities = Set<String>()
     var dedupBarcodes = Set<String>()
     var dedupTextBlocks = Set<String>()
+    var barcodesFilteredByAllowList = 0
 
     for observation in observations {
       let document = observation.document
@@ -133,6 +154,7 @@ enum RecognizeDocumentsAnalyzer {
 
           let format = normalizeBarcodeSymbology(barcode.symbology)
           if !allowedFormats.isEmpty && !allowedFormats.contains(format) {
+            barcodesFilteredByAllowList += 1
             continue
           }
 
@@ -205,7 +227,7 @@ enum RecognizeDocumentsAnalyzer {
       ? DocumentSemantics.inferRegions(from: sortedTextBlocks)
       : []
 
-    return PageAnalysis(
+    let result = PageAnalysis(
       barcodes: barcodes.sorted { lhs, rhs in
         if lhs.sourceImageIndex != rhs.sourceImageIndex {
           return lhs.sourceImageIndex < rhs.sourceImageIndex
@@ -225,6 +247,10 @@ enum RecognizeDocumentsAnalyzer {
         fields: fields
       )
     )
+    log(
+      "analyzeImage sourceImageIndex=\(sourceImageIndex) result barcodes=\(barcodes.count) filteredByAllowList=\(barcodesFilteredByAllowList) textBlocks=\(sortedTextBlocks.count) tables=\(tables.count) regions=\(regions.count)"
+    )
+    return result
   }
 
   private static func extractTextBlocks(

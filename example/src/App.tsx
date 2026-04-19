@@ -3,13 +3,17 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
   View,
 } from 'react-native';
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import DocumentScanner, {
   ResponseType,
   type AnalysisResult,
@@ -67,7 +71,7 @@ const INITIAL_EXTRACT: ExtractToggles = {
   structuredData: true,
 };
 
-const INITIAL_BARCODE_FORMATS: BarcodeFormatValue[] = ['qr', 'ean13'];
+const INITIAL_BARCODE_FORMATS: BarcodeFormatValue[] = [];
 
 function formatError(error: unknown): string {
   if (typeof error === 'string') {
@@ -110,6 +114,21 @@ function toDisplayImageUri(source: string, responseType: ResponseType): string {
   }
 
   return source;
+}
+
+function imageSourceScheme(source: string | undefined): string {
+  if (!source) {
+    return 'n/a';
+  }
+  const normalized = source.trim();
+  const schemeEnd = normalized.indexOf('://');
+  if (schemeEnd > 0) {
+    return normalized.slice(0, schemeEnd).toLowerCase();
+  }
+  if (normalized.startsWith('/')) {
+    return 'path';
+  }
+  return 'unknown';
 }
 
 function jsonPreview(value: unknown): string {
@@ -189,7 +208,8 @@ function JsonCard(props: { title: string; value: unknown }) {
   );
 }
 
-export default function App() {
+function AppContent() {
+  const insets = useSafeAreaInsets();
   const [responseType, setResponseType] = useState<ResponseType>(
     ResponseType.ImageFilePath
   );
@@ -230,6 +250,7 @@ export default function App() {
   );
 
   const selectedImageSource = scannedImages[selectedImageIndex];
+  const firstImageScheme = imageSourceScheme(scannedImages[0]);
   const selectedImageUri = selectedImageSource
     ? toDisplayImageUri(selectedImageSource, imagesResponseType)
     : null;
@@ -467,8 +488,13 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <SafeAreaView edges={['top', 'right', 'left']} style={styles.safeArea}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom },
+        ]}
+      >
         <Text style={styles.title}>Document Scanner Example</Text>
         <Text style={styles.subtitle}>
           Full demo for scan + files/gallery pickers + barcode + OCR +
@@ -614,6 +640,13 @@ export default function App() {
           </Text>
           <Text style={styles.summaryLine}>source: {pageSource ?? 'n/a'}</Text>
           <Text style={styles.summaryLine}>
+            barcodeFormats:{' '}
+            {barcodeFormats.length > 0 ? barcodeFormats.join(', ') : 'all'}
+          </Text>
+          <Text style={styles.summaryLine}>
+            first image scheme: {firstImageScheme}
+          </Text>
+          <Text style={styles.summaryLine}>
             scannedImages: {scannedImages.length}
           </Text>
           <Text style={styles.summaryLine}>barcodes: {barcodes.length}</Text>
@@ -680,6 +713,14 @@ export default function App() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
   );
 }
 

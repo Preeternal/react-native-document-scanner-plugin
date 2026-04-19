@@ -1,30 +1,49 @@
 import Foundation
 
 enum StructuredDataNormalizer {
-  private static let fieldKeySanitizeRegex = try? NSRegularExpression(
+  private static let fieldKeySanitizeRegex = compileRegex(
+    name: "fieldKeySanitizeRegex",
     pattern: "[^a-z0-9а-я]+",
     options: []
   )
 
-  private static let currencyCodeRegex = try? NSRegularExpression(
+  private static let currencyCodeRegex = compileRegex(
+    name: "currencyCodeRegex",
     pattern: "\\b(usd|eur|gbp|uah|rub|brl)\\b",
     options: [.caseInsensitive]
   )
 
-  private static let numericCandidateRegex = try? NSRegularExpression(
+  private static let numericCandidateRegex = compileRegex(
+    name: "numericCandidateRegex",
     pattern: "[-+]?\\d[\\d.,\\s]*\\d|[-+]?\\d",
     options: []
   )
 
-  private static let nonIdSymbolRegex = try? NSRegularExpression(
+  private static let nonIdSymbolRegex = compileRegex(
+    name: "nonIdSymbolRegex",
     pattern: "[^A-Z0-9_-]",
     options: []
   )
 
-  private static let nonIdDedupRegex = try? NSRegularExpression(
+  private static let nonIdDedupRegex = compileRegex(
+    name: "nonIdDedupRegex",
     pattern: "[^A-Z0-9]",
     options: []
   )
+
+  private static func compileRegex(
+    name: String,
+    pattern: String,
+    options: NSRegularExpression.Options
+  ) -> NSRegularExpression? {
+    do {
+      return try NSRegularExpression(pattern: pattern, options: options)
+    } catch {
+      assertionFailure("Invalid regex '\(name)': \(error)")
+      NSLog("[DocumentScanner][StructuredDataNormalizer] regex compile failed name=\(name) error=\(error.localizedDescription)")
+      return nil
+    }
+  }
 
   private static let idFieldHints: Set<String> = [
     "id",

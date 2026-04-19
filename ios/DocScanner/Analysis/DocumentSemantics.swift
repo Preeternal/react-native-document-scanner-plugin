@@ -7,35 +7,55 @@ private struct TextLineEntry {
 }
 
 enum DocumentSemantics {
-  private static let fieldRegex = try? NSRegularExpression(
+  private static let fieldRegex = compileRegex(
+    name: "fieldRegex",
     pattern: "^([A-Za-z0-9А-Яа-я _./-]{2,40})\\s*[:-]\\s*(.+)$",
     options: []
   )
 
-  private static let phoneRegex = try? NSRegularExpression(
+  private static let phoneRegex = compileRegex(
+    name: "phoneRegex",
     pattern: "(?:\\+?\\d[\\d\\s().-]{7,}\\d)",
     options: []
   )
 
-  private static let emailRegex = try? NSRegularExpression(
+  private static let emailRegex = compileRegex(
+    name: "emailRegex",
     pattern: "[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}",
     options: [.caseInsensitive]
   )
 
-  private static let dateRegex = try? NSRegularExpression(
+  private static let dateRegex = compileRegex(
+    name: "dateRegex",
     pattern: "\\b(?:\\d{1,2}[./-]\\d{1,2}[./-]\\d{2,4}|\\d{4}[./-]\\d{1,2}[./-]\\d{1,2})\\b",
     options: []
   )
 
-  private static let amountRegex = try? NSRegularExpression(
+  private static let amountRegex = compileRegex(
+    name: "amountRegex",
     pattern: "\\b(?:[$€£]\\s?)?\\d{1,3}(?:[ ,]\\d{3})*(?:[.,]\\d{2})\\b",
     options: []
   )
 
-  private static let tableSplitRegex = try? NSRegularExpression(
+  private static let tableSplitRegex = compileRegex(
+    name: "tableSplitRegex",
     pattern: "\\s{2,}|\\t|\\|",
     options: []
   )
+
+  private static func compileRegex(
+    name: String,
+    pattern: String,
+    options: NSRegularExpression.Options
+  ) -> NSRegularExpression? {
+    do {
+      return try NSRegularExpression(pattern: pattern, options: options)
+    } catch {
+      assertionFailure("Invalid regex '\(name)': \(error)")
+      NSLog("[DocumentScanner][DocumentSemantics] regex compile failed name=\(name) error=\(error.localizedDescription)")
+      return nil
+    }
+  }
 
   static func inferRegions(from textBlocks: [AnalysisTextBlock]) -> [AnalysisRegion] {
     var regions: [AnalysisRegion] = []

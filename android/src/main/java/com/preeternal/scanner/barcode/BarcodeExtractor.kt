@@ -17,4 +17,10 @@ interface BarcodeExtractor {
     allowedFormats: Set<String>,
     callback: (List<BarcodeResult>) -> Unit
   )
+
+  /**
+   * Releases implementation-specific resources (for example cached ML Kit scanners).
+   * Default no-op for feature-disabled stubs.
+   */
+  fun release() {}
 }

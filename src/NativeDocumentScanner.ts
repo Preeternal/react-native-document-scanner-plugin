@@ -44,6 +44,13 @@ export interface ExtractBarcodesFromImagesOptions {
    * @default 2
    */
   concurrency?: AnalysisConcurrency;
+
+  /**
+   * Android-only. Per-image barcode extraction timeout in milliseconds.
+   * Clamped natively to a safe range.
+   * @default 10000
+   */
+  barcodeTimeoutMs?: number;
 }
 
 /**
@@ -73,6 +80,13 @@ export interface ExtractTextFromImagesOptions {
    * @default false
    */
   ocrRotate180Fallback?: boolean;
+
+  /**
+   * Android-only. Per-image OCR extraction timeout in milliseconds.
+   * Clamped natively to a safe range.
+   * @default 25000
+   */
+  textTimeoutMs?: number;
 }
 
 /**
@@ -241,6 +255,13 @@ export interface AnalyzeScannedImagesOptions
   extract: AnalyzeExtractOptions;
 
   /**
+   * Android-only. Per-image OCR extraction timeout in milliseconds for text-related stages.
+   * Clamped natively to a safe range.
+   * @default 25000
+   */
+  textTimeoutMs?: number;
+
+  /**
    * Enables adaptive OCR fallback for text/semantics stages.
    * @default true
    */
@@ -260,6 +281,10 @@ export interface AnalyzeScannedImagesRequest
   extractRegions?: boolean;
   extractStructuredData?: boolean;
   ocrRotate180Fallback?: boolean;
+  /**
+   * Android-only. Per-image OCR extraction timeout in milliseconds for text-related stages.
+   */
+  textTimeoutMs?: number;
 }
 
 /**

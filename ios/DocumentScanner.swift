@@ -25,6 +25,10 @@ public class DocumentScannerImpl: NSObject {
     let imageSource: String
   }
 
+  private func log(_ scope: String, _ message: @autoclosure () -> String) {
+    DocScannerDebugLog.log(scope, message())
+  }
+
   @objc static func requiresMainQueueSetup() -> Bool { true }
 
   @objc(scanDocument:resolve:reject:)
@@ -33,6 +37,7 @@ public class DocumentScannerImpl: NSObject {
     resolve: @escaping RCTPromiseResolveBlock,
     reject: @escaping RCTPromiseRejectBlock
   ) {
+    log("scanDocument", "invoked")
     guard #available(iOS 13.0, *) else {
       reject("unsupported_ios", "iOS 13.0 or higher required", nil)
       return
@@ -42,12 +47,17 @@ public class DocumentScannerImpl: NSObject {
     let responseType = opts["responseType"] as? String
     let quality = opts["croppedImageQuality"] as? Int
     let isBase64Response = responseType?.lowercased() == "base64"
+    log(
+      "scanDocument",
+      "responseType=\(responseType ?? "default") quality=\(quality ?? 100) base64=\(isBase64Response)"
+    )
 
     DispatchQueue.main.async {
       self.docScanner = DocScanner()
       self.docScanner?.startScan(
         RCTPresentedViewController(),
         successHandler: { (scannedData: [[String: Any]]) in
+          self.log("scanDocument", "native scanner returned pages=\(scannedData.count)")
           let fm = FileManager.default
           var sanitizedImages: [String] = []
 
@@ -64,6 +74,7 @@ public class DocumentScannerImpl: NSObject {
                 path = trimmed
               }
               if !fm.fileExists(atPath: path) {
+                self.log("scanDocument", "skip non-existing file path for scanned page")
                 continue
               }
             }
@@ -75,13 +86,16 @@ public class DocumentScannerImpl: NSObject {
             "status": "success",
             "scannedImages": sanitizedImages
           ])
+          self.log("scanDocument", "resolved scannedImages=\(sanitizedImages.count)")
           self.docScanner = nil
         },
         errorHandler: { msg in
+          self.log("scanDocument", "error=\(msg)")
           reject("document_scan_error", msg, nil)
           self.docScanner = nil
         },
         cancelHandler: {
+          self.log("scanDocument", "cancelled")
           resolve([
             "status": "cancel",
             "scannedImages": []
@@ -100,6 +114,7 @@ public class DocumentScannerImpl: NSObject {
     resolve: @escaping RCTPromiseResolveBlock,
     reject: @escaping RCTPromiseRejectBlock
   ) {
+    log("extractBarcodesFromImages", "invoked")
     guard #available(iOS 13.0, *) else {
       reject("unsupported_ios", "iOS 13.0 or higher required", nil)
       return
@@ -113,8 +128,13 @@ public class DocumentScannerImpl: NSObject {
 
     let requestedConcurrency = opts["concurrency"] as? Int ?? 2
     let concurrency = max(1, min(2, requestedConcurrency))
+    log(
+      "extractBarcodesFromImages",
+      "rawImages=\(rawImages.count) validSources=\(sources.count) concurrency=\(concurrency) allowedFormats=\(allowedFormats)"
+    )
 
     if sources.isEmpty {
+      log("extractBarcodesFromImages", "no valid sources, resolve []")
       resolve([])
       return
     }
@@ -134,17 +154,45 @@ public class DocumentScannerImpl: NSObject {
         options: modernOptions,
         concurrency: concurrency
       ) { analysis in
-        resolve(analysis.barcodes.map(self.toDictionary))
+        let modernBarcodes = analysis.barcodes.map(self.toDictionary)
+        self.log(
+          "extractBarcodesFromImages",
+          "modern analysis barcodes=\(modernBarcodes.count)"
+        )
+        if !modernBarcodes.isEmpty {
+          self.log("extractBarcodesFromImages", "resolved with modern barcodes")
+          resolve(modernBarcodes)
+          return
+        }
+
+        // Fallback for non-document gallery assets where RecognizeDocuments may miss 1D barcodes.
+        self.log("extractBarcodesFromImages", "modern empty, starting legacy fallback")
+        self.performBarcodeExtraction(
+          sources: sources,
+          allowedFormats: allowedFormats,
+          concurrency: concurrency
+        ) { legacyBarcodes in
+          self.log(
+            "extractBarcodesFromImages",
+            "legacy fallback barcodes=\(legacyBarcodes.count)"
+          )
+          resolve(legacyBarcodes)
+        }
       }
       return
     }
 
     // TODO(preeternal): Remove this legacy barcode path when iOS 26+ becomes the practical baseline.
+    log("extractBarcodesFromImages", "using legacy path (iOS < 26)")
     performBarcodeExtraction(
       sources: sources,
       allowedFormats: allowedFormats,
       concurrency: concurrency
     ) { extractedBarcodes in
+      self.log(
+        "extractBarcodesFromImages",
+        "legacy path resolved barcodes=\(extractedBarcodes.count)"
+      )
       resolve(extractedBarcodes)
     }
   }
@@ -155,6 +203,7 @@ public class DocumentScannerImpl: NSObject {
     resolve: @escaping RCTPromiseResolveBlock,
     reject: @escaping RCTPromiseRejectBlock
   ) {
+    log("extractTextFromImages", "invoked")
     guard #available(iOS 13.0, *) else {
       reject("unsupported_ios", "iOS 13.0 or higher required", nil)
       return
@@ -166,8 +215,13 @@ public class DocumentScannerImpl: NSObject {
     let ocrRotate180Fallback = opts["ocrRotate180Fallback"] as? Bool ?? false
     let requestedConcurrency = opts["concurrency"] as? Int ?? 2
     let concurrency = max(1, min(2, requestedConcurrency))
+    log(
+      "extractTextFromImages",
+      "rawImages=\(rawImages.count) validSources=\(sources.count) concurrency=\(concurrency) rotate180=\(ocrRotate180Fallback)"
+    )
 
     if sources.isEmpty {
+      log("extractTextFromImages", "no valid sources, resolve []")
       resolve([])
       return
     }
@@ -187,6 +241,7 @@ public class DocumentScannerImpl: NSObject {
         options: modernOptions,
         concurrency: concurrency
       ) { analysis in
+        self.log("extractTextFromImages", "modern textBlocks=\(analysis.textBlocks.count)")
         resolve(self.toDictionaryArray(analysis.textBlocks))
       }
       return
@@ -198,6 +253,7 @@ public class DocumentScannerImpl: NSObject {
       ocrRotate180Fallback: ocrRotate180Fallback,
       concurrency: concurrency
     ) { textBlocks in
+      self.log("extractTextFromImages", "legacy textBlocks=\(textBlocks.count)")
       resolve(self.toDictionaryArray(textBlocks))
     }
   }
@@ -208,6 +264,7 @@ public class DocumentScannerImpl: NSObject {
     resolve: @escaping RCTPromiseResolveBlock,
     reject: @escaping RCTPromiseRejectBlock
   ) {
+    log("analyzeScannedImages", "invoked")
     guard #available(iOS 13.0, *) else {
       reject("unsupported_ios", "iOS 13.0 or higher required", nil)
       return
@@ -223,9 +280,14 @@ public class DocumentScannerImpl: NSObject {
     let wantsRegions = opts["extractRegions"] as? Bool ?? false
     let wantsStructuredData = opts["extractStructuredData"] as? Bool ?? false
     let wantsTextPipeline = wantsText || wantsTables || wantsRegions || wantsStructuredData
-    let ocrRotate180Fallback = opts["ocrRotate180Fallback"] as? Bool ?? false
+    let ocrRotate180Fallback = opts["ocrRotate180Fallback"] as? Bool ?? true
+    log(
+      "analyzeScannedImages",
+      "rawImages=\(rawImages.count) validSources=\(sources.count) extract(barcodes=\(wantsBarcodes), text=\(wantsText), tables=\(wantsTables), regions=\(wantsRegions), structured=\(wantsStructuredData)) rotate180=\(ocrRotate180Fallback)"
+    )
 
     if sources.isEmpty || (!wantsBarcodes && !wantsTextPipeline) {
+      log("analyzeScannedImages", "nothing to analyze, resolve success")
       resolve(["status": "success"])
       return
     }
@@ -234,6 +296,10 @@ public class DocumentScannerImpl: NSObject {
     let concurrency = max(1, min(2, requestedConcurrency))
     let allowedFormats = (opts["barcodeFormats"] as? [Any] ?? [])
       .compactMap { $0 as? String }
+    log(
+      "analyzeScannedImages",
+      "concurrency=\(concurrency) allowedFormats=\(allowedFormats)"
+    )
 
     if #available(iOS 26.0, *) {
       let modernOptions = RecognizeDocumentsAnalyzer.Options(
@@ -250,36 +316,66 @@ public class DocumentScannerImpl: NSObject {
         options: modernOptions,
         concurrency: concurrency
       ) { analysis in
-        var response: [String: Any] = [
-          "status": "success"
-        ]
+        self.log(
+          "analyzeScannedImages",
+          "modern result barcodes=\(analysis.barcodes.count) textBlocks=\(analysis.textBlocks.count) tables=\(analysis.tables.count) regions=\(analysis.regions.count)"
+        )
+        let finalize: ([[String: Any]]) -> Void = { barcodePayload in
+          var response: [String: Any] = [
+            "status": "success"
+          ]
 
-        if wantsBarcodes {
-          response["barcodes"] = analysis.barcodes.map(self.toDictionary)
-        }
-
-        if wantsText {
-          let mappedText = self.toDictionaryArray(analysis.textBlocks)
-          response["textBlocks"] = mappedText
-          response["text"] = mappedText
-        }
-
-        if wantsTables {
-          response["tables"] = analysis.tables.map(self.toDictionary)
-        }
-
-        if wantsRegions {
-          response["regions"] = analysis.regions.map(self.toDictionary)
-        }
-
-        if wantsStructuredData {
-          let mapped = self.toDictionary(analysis.structuredData)
-          if mapped["entities"] != nil || mapped["fields"] != nil {
-            response["structuredData"] = mapped
+          if wantsBarcodes {
+            response["barcodes"] = barcodePayload
           }
+
+          if wantsText {
+            let mappedText = self.toDictionaryArray(analysis.textBlocks)
+            response["textBlocks"] = mappedText
+            response["text"] = mappedText
+          }
+
+          if wantsTables {
+            response["tables"] = analysis.tables.map(self.toDictionary)
+          }
+
+          if wantsRegions {
+            response["regions"] = analysis.regions.map(self.toDictionary)
+          }
+
+          if wantsStructuredData {
+            let mapped = self.toDictionary(analysis.structuredData)
+            if mapped["entities"] != nil || mapped["fields"] != nil {
+              response["structuredData"] = mapped
+            }
+          }
+
+          resolve(response)
+          self.log(
+            "analyzeScannedImages",
+            "resolved status=success barcodes=\(barcodePayload.count)"
+          )
         }
 
-        resolve(response)
+        let modernBarcodes = analysis.barcodes.map(self.toDictionary)
+        if wantsBarcodes && modernBarcodes.isEmpty {
+          // Fallback for non-document gallery assets where RecognizeDocuments may miss 1D barcodes.
+          self.log("analyzeScannedImages", "modern barcodes empty, starting legacy barcode fallback")
+          self.performBarcodeExtraction(
+            sources: sources,
+            allowedFormats: allowedFormats,
+            concurrency: concurrency
+          ) { legacyBarcodes in
+            self.log(
+              "analyzeScannedImages",
+              "legacy barcode fallback count=\(legacyBarcodes.count)"
+            )
+            finalize(legacyBarcodes)
+          }
+          return
+        }
+
+        finalize(modernBarcodes)
       }
       return
     }
@@ -301,6 +397,10 @@ public class DocumentScannerImpl: NSObject {
       ) { extracted in
         barcodes = extracted
         barcodeStage = .success
+        self.log(
+          "analyzeScannedImages",
+          "legacy barcode stage finished count=\(extracted.count)"
+        )
         group.leave()
       }
     }
@@ -315,6 +415,10 @@ public class DocumentScannerImpl: NSObject {
       ) { extracted in
         textBlocks = extracted
         textStage = .success
+        self.log(
+          "analyzeScannedImages",
+          "legacy text stage finished count=\(extracted.count)"
+        )
         group.leave()
       }
     }
@@ -355,26 +459,36 @@ public class DocumentScannerImpl: NSObject {
       }
 
       resolve(response)
+      self.log(
+        "analyzeScannedImages",
+        "legacy resolved status=\(response["status"] as? String ?? "unknown") barcodes=\(barcodes.count) textBlocks=\(textBlocks.count)"
+      )
     }
   }
 
   @objc
   public func invalidate() {
+    log("lifecycle", "invalidate called, cancelling analysis queue")
     docScanner = nil
     analysisQueue.cancelAllOperations()
   }
 
   private func buildImageSources(_ rawImages: [Any]) -> [IndexedImageSource] {
-    return rawImages.enumerated().compactMap { index, source in
+    let mapped = rawImages.enumerated().compactMap { entry -> IndexedImageSource? in
+      let (index, source) = entry
       guard let imageSource = source as? String else {
+        self.log("sources", "skip source[\(index)] not a string")
         return nil
       }
       let normalized = imageSource.trimmingCharacters(in: .whitespacesAndNewlines)
       if normalized.isEmpty {
+        self.log("sources", "skip source[\(index)] empty")
         return nil
       }
       return IndexedImageSource(sourceImageIndex: index, imageSource: normalized)
     }
+    log("sources", "mapped valid sources=\(mapped.count) from raw=\(rawImages.count)")
+    return mapped
   }
 
   @available(iOS 26.0, *)
@@ -393,6 +507,10 @@ public class DocumentScannerImpl: NSObject {
     concurrency: Int,
     completion: @escaping (ModernAnalysisResult) -> Void
   ) {
+    log(
+      "performModernAnalysis",
+      "start sources=\(sources.count) concurrency=\(concurrency) include(barcodes=\(options.includeBarcodes), text=\(options.includeText), tables=\(options.includeTables), regions=\(options.includeRegions), structured=\(options.includeStructuredData)) allowedFormats=\(options.allowedBarcodeFormats)"
+    )
     if sources.isEmpty {
       DispatchQueue.main.async {
         completion(ModernAnalysisResult())
@@ -424,13 +542,22 @@ public class DocumentScannerImpl: NSObject {
         }
 
         guard let image = BarcodeImageSource.loadImage(from: source.imageSource) else {
+          self.log("performModernAnalysis", "source[\(source.sourceImageIndex)] image load failed")
           return
         }
+        self.log(
+          "performModernAnalysis",
+          "source[\(source.sourceImageIndex)] image loaded size=\(Int(image.size.width))x\(Int(image.size.height))"
+        )
 
         let page = RecognizeDocumentsAnalyzer.analyzeImageBlocking(
           image,
           sourceImageIndex: source.sourceImageIndex,
           options: options
+        )
+        self.log(
+          "performModernAnalysis",
+          "source[\(source.sourceImageIndex)] page result barcodes=\(page.barcodes.count) textBlocks=\(page.textBlocks.count) tables=\(page.tables.count) regions=\(page.regions.count)"
         )
 
         lock.lock()
@@ -503,6 +630,10 @@ public class DocumentScannerImpl: NSObject {
         entities: entities,
         fields: fields
       )
+      self.log(
+        "performModernAnalysis",
+        "merged barcodes=\(merged.barcodes.count) textBlocks=\(merged.textBlocks.count) tables=\(merged.tables.count) regions=\(merged.regions.count)"
+      )
 
       completion(merged)
     }
@@ -514,6 +645,10 @@ public class DocumentScannerImpl: NSObject {
     concurrency: Int,
     completion: @escaping ([[String: Any]]) -> Void
   ) {
+    log(
+      "performBarcodeExtraction",
+      "start sources=\(sources.count) concurrency=\(concurrency) allowedFormats=\(allowedFormats)"
+    )
     if sources.isEmpty {
       DispatchQueue.main.async {
         completion([])
@@ -545,12 +680,21 @@ public class DocumentScannerImpl: NSObject {
         }
 
         guard let image = BarcodeImageSource.loadImage(from: source.imageSource) else {
+          self.log("performBarcodeExtraction", "source[\(source.sourceImageIndex)] image load failed")
           return
         }
+        self.log(
+          "performBarcodeExtraction",
+          "source[\(source.sourceImageIndex)] image loaded size=\(Int(image.size.width))x\(Int(image.size.height))"
+        )
 
         let detected = BarcodeExtractor.extractFromImage(
           image,
           allowedFormats: allowedFormats
+        )
+        self.log(
+          "performBarcodeExtraction",
+          "source[\(source.sourceImageIndex)] raw detected=\(detected.count)"
         )
 
         guard !detected.isEmpty else {
@@ -571,6 +715,10 @@ public class DocumentScannerImpl: NSObject {
         }
 
         guard !mapped.isEmpty else {
+          self.log(
+            "performBarcodeExtraction",
+            "source[\(source.sourceImageIndex)] mapped empty after sanitization"
+          )
           return
         }
 
@@ -596,6 +744,7 @@ public class DocumentScannerImpl: NSObject {
       }
 
       completion(sorted)
+      self.log("performBarcodeExtraction", "completed total barcodes=\(sorted.count)")
     }
   }
 
@@ -605,6 +754,10 @@ public class DocumentScannerImpl: NSObject {
     concurrency: Int,
     completion: @escaping ([AnalysisTextBlock]) -> Void
   ) {
+    log(
+      "performTextExtraction",
+      "start sources=\(sources.count) concurrency=\(concurrency) rotate180=\(ocrRotate180Fallback)"
+    )
     if sources.isEmpty {
       DispatchQueue.main.async {
         completion([])
@@ -636,6 +789,7 @@ public class DocumentScannerImpl: NSObject {
         }
 
         guard let image = BarcodeImageSource.loadImage(from: source.imageSource) else {
+          self.log("performTextExtraction", "source[\(source.sourceImageIndex)] image load failed")
           return
         }
 
@@ -643,6 +797,10 @@ public class DocumentScannerImpl: NSObject {
           image,
           sourceImageIndex: source.sourceImageIndex,
           enableRotate180Fallback: ocrRotate180Fallback
+        )
+        self.log(
+          "performTextExtraction",
+          "source[\(source.sourceImageIndex)] text blocks=\(detected.count)"
         )
 
         guard !detected.isEmpty else {
@@ -678,6 +836,7 @@ public class DocumentScannerImpl: NSObject {
       }
 
       completion(sorted)
+      self.log("performTextExtraction", "completed total textBlocks=\(sorted.count)")
     }
   }
 

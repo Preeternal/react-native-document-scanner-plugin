@@ -119,6 +119,87 @@ The `package.json` file contains various scripts for common tasks:
 - `yarn example android`: run the example app on Android.
 - `yarn example ios`: run the example app on iOS.
 
+### Native debug logs (iOS)
+
+iOS native logs in this project are opt-in.
+
+- `DOCUMENT_SCANNER_DEBUG_LOGS=1` enables high-level logs.
+- `DOCUMENT_SCANNER_TRACE_LOGS=1` enables verbose trace logs (and high-level logs).
+
+Example for physical device launch via `devicectl`:
+
+```sh
+REPO="$(git rev-parse --show-toplevel)"
+mkdir -p "$REPO/logs"
+
+xcrun devicectl device process launch \
+  --device <YOUR_DEVICE_ID_OR_NAME> \
+  --terminate-existing \
+  --console \
+  --environment-variables '{"DOCUMENT_SCANNER_TRACE_LOGS":"1"}' \
+  preeternal.scanner.example 2>&1 \
+| grep --line-buffered '\[DocumentScanner\]' \
+| tee "$REPO/logs/ios-trace.log"
+```
+
+Example for Simulator (`log stream`), after app launch with env flag:
+
+```sh
+xcrun simctl spawn booted log stream --level debug \
+  --predicate 'eventMessage CONTAINS[c] "[DocumentScanner]"'
+```
+
+### Native debug logs (Android)
+
+Android native logs are also opt-in.
+
+Enable one of the flags before launching the app:
+
+- `debug.document_scanner.debug_logs=1` enables high-level logs.
+- `debug.document_scanner.trace_logs=1` enables verbose trace logs (and high-level logs).
+
+```sh
+adb shell setprop debug.document_scanner.debug_logs 1
+adb shell setprop debug.document_scanner.trace_logs 1
+```
+
+After changing Android debug properties, restart the app process to apply them:
+
+```sh
+adb shell am force-stop <YOUR_APP_PACKAGE>
+```
+
+If you changed native code, rebuild/reinstall the app before running log capture.
+
+Clear/disable flags:
+
+```sh
+adb shell setprop debug.document_scanner.debug_logs 0
+adb shell setprop debug.document_scanner.trace_logs 0
+adb shell am force-stop <YOUR_APP_PACKAGE>
+```
+
+Barcode run to file:
+
+```sh
+REPO="$(git rev-parse --show-toplevel)"
+mkdir -p "$REPO/logs"
+adb logcat -c
+adb logcat -v time DocumentScanner:D DocumentScannerBarcode:V '*:S' \
+| grep --line-buffered -Ei 'extractBarcodes|runBarcodeAnalysisStage|Barcode|DocumentScannerBarcode' \
+| tee "$REPO/logs/android-barcode.log"
+```
+
+Text run to file:
+
+```sh
+REPO="$(git rev-parse --show-toplevel)"
+mkdir -p "$REPO/logs"
+adb logcat -c
+adb logcat -v time DocumentScanner:D DocumentScannerBarcode:V ReactNative:W AndroidRuntime:E '*:S' \
+| tee "$REPO/logs/android-text-full-unfiltered.log"
+```
+
 ### Sending a pull request
 
 > **Working on your first pull request?** You can learn how from this _free_ series: [How to Contribute to an Open Source Project on GitHub](https://app.egghead.io/playlists/how-to-contribute-to-an-open-source-project-on-github).

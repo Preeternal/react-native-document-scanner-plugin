@@ -4,16 +4,19 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.graphics.Rect
+import com.google.android.gms.tasks.Tasks
 import com.google.mlkit.vision.barcode.BarcodeScanner
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import com.preeternal.scanner.DocScannerDebugLog
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
 class BarcodeExtractorImpl : BarcodeExtractor {
   companion object {
+    private const val TAG = "DocumentScannerBarcode"
     private const val CROP_WIDTH_PERCENT = 25.0f
     private const val CROP_HEIGHT_PERCENT = 20.0f
     private const val CORNER_MARGIN_PERCENT = 3.0f
@@ -38,6 +41,18 @@ class BarcodeExtractorImpl : BarcodeExtractor {
 
   private val scannerCache = mutableMapOf<String, BarcodeScanner>()
 
+  private fun logDebug(message: String) {
+    DocScannerDebugLog.debug(TAG, message)
+  }
+
+  private fun logWarn(message: String) {
+    DocScannerDebugLog.warn(TAG, message)
+  }
+
+  private fun logTrace(message: String) {
+    DocScannerDebugLog.trace(TAG, message)
+  }
+
   private data class BarcodeCandidate(
     val dedupKey: String,
     val result: BarcodeResult
@@ -54,119 +69,107 @@ class BarcodeExtractorImpl : BarcodeExtractor {
   ) {
     val normalizedAllowList = BarcodeFormats.normalizeRequestedFormats(allowedFormats.toList())
     val sourceBitmap = BarcodeImageSourceLoader.loadBitmap(context, imageSource) ?: run {
+      logDebug("extractFromSource index=$sourceImageIndex image load failed sourceLength=${imageSource.length}")
       callback(emptyList())
       return
     }
+    logDebug(
+      "extractFromSource index=$sourceImageIndex bitmap=${sourceBitmap.width}x${sourceBitmap.height} allowedFormats=${normalizedAllowList.sorted()}"
+    )
 
     val scanner = scannerForAllowedFormats(normalizedAllowList)
-    processAttempt(
+    val detected = processAttempts(
       scanner = scanner,
       sourceBitmap = sourceBitmap,
       sourceImageIndex = sourceImageIndex,
-      allowedFormats = normalizedAllowList,
-      attemptIndex = 0,
-      collected = LinkedHashMap(),
-      callback = callback
+      allowedFormats = normalizedAllowList
     )
+    callback(detected)
   }
 
-  private fun processAttempt(
+  private fun processAttempts(
     scanner: BarcodeScanner,
     sourceBitmap: Bitmap,
     sourceImageIndex: Int,
-    allowedFormats: Set<String>,
-    attemptIndex: Int,
-    collected: LinkedHashMap<String, BarcodeResult>,
-    callback: (List<BarcodeResult>) -> Unit
-  ) {
-    if (attemptIndex >= 4) {
-      callback(collected.values.toList())
-      return
-    }
+    allowedFormats: Set<String>
+  ): List<BarcodeResult> {
+    val collected = LinkedHashMap<String, BarcodeResult>()
+    var exhaustedAttempts = true
 
-    if (attemptIndex > 0 && collected.isNotEmpty()) {
-      callback(collected.values.toList())
-      return
-    }
+    for (attemptIndex in 0 until 8) {
+      if (attemptIndex > 0 && collected.isNotEmpty()) {
+        logDebug("attempt=$attemptIndex stop: early success collected=${collected.size}")
+        exhaustedAttempts = false
+        break
+      }
 
-    val angle = when (attemptIndex) {
-      0 -> 0f
-      1 -> 180f
-      2 -> 90f
-      else -> -90f
-    }
+      val rotationIndex = attemptIndex % 4
+      val useRoi = attemptIndex < 4
 
-    val candidate = if (angle == 0f) {
-      sourceBitmap
-    } else {
-      rotateBitmap(sourceBitmap, angle)
-    }
+      val angle = when (rotationIndex) {
+        0 -> 0f
+        1 -> 180f
+        2 -> 90f
+        else -> -90f
+      }
 
-    if (candidate == null) {
-      processAttempt(
-        scanner,
-        sourceBitmap,
-        sourceImageIndex,
-        allowedFormats,
-        attemptIndex + 1,
-        collected,
-        callback
+      val candidate = if (angle == 0f) {
+        sourceBitmap
+      } else {
+        rotateBitmap(sourceBitmap, angle)
+      }
+
+      if (candidate == null) {
+        logTrace("attempt=$attemptIndex rotate failed angle=$angle")
+        continue
+      }
+
+      val targetBitmap = if (useRoi) {
+        cropTopRightRoi(candidate)
+      } else {
+        candidate
+      }
+
+      if (targetBitmap == null) {
+        logTrace("attempt=$attemptIndex target bitmap null useRoi=$useRoi")
+        continue
+      }
+
+      logTrace(
+        "attempt=$attemptIndex useRoi=$useRoi angle=$angle target=${targetBitmap.width}x${targetBitmap.height} collectedBefore=${collected.size}"
       )
-      return
-    }
 
-    val roiBitmap = cropTopRightRoi(candidate)
-    if (roiBitmap == null) {
-      processAttempt(
-        scanner,
-        sourceBitmap,
-        sourceImageIndex,
-        allowedFormats,
-        attemptIndex + 1,
-        collected,
-        callback
+      val input = InputImage.fromBitmap(targetBitmap, 0)
+      val barcodes = try {
+        Tasks.await(scanner.process(input))
+      } catch (error: Exception) {
+        logWarn("attempt=$attemptIndex failure: ${error.message}")
+        continue
+      }
+
+      val mapped = barcodesToCandidates(
+        barcodes = barcodes,
+        sourceImageIndex = sourceImageIndex,
+        allowedFormats = allowedFormats,
+        attemptIndex = attemptIndex,
+        roiWidth = targetBitmap.width,
+        roiHeight = targetBitmap.height
       )
-      return
-    }
-
-    val input = InputImage.fromBitmap(roiBitmap, 0)
-    scanner.process(input)
-      .addOnSuccessListener { barcodes ->
-        val mapped = barcodesToCandidates(
-          barcodes = barcodes,
-          sourceImageIndex = sourceImageIndex,
-          allowedFormats = allowedFormats,
-          attemptIndex = attemptIndex,
-          roiWidth = roiBitmap.width,
-          roiHeight = roiBitmap.height
-        )
-        for (candidateResult in mapped) {
-          if (!collected.containsKey(candidateResult.dedupKey)) {
-            collected[candidateResult.dedupKey] = candidateResult.result
-          }
+      logTrace(
+        "attempt=$attemptIndex success rawBarcodes=${barcodes.size} mapped=${mapped.size}"
+      )
+      for (candidateResult in mapped) {
+        if (!collected.containsKey(candidateResult.dedupKey)) {
+          collected[candidateResult.dedupKey] = candidateResult.result
         }
+      }
+      logTrace("attempt=$attemptIndex collectedAfter=${collected.size}")
+    }
 
-        processAttempt(
-          scanner,
-          sourceBitmap,
-          sourceImageIndex,
-          allowedFormats,
-          attemptIndex + 1,
-          collected,
-          callback
-        )
-      }
-      .addOnFailureListener {
-        processAttempt(
-          scanner,
-          sourceBitmap,
-          sourceImageIndex,
-          allowedFormats,
-          attemptIndex + 1,
-          collected,
-          callback
-        )
-      }
+    if (exhaustedAttempts) {
+      logDebug("attempt=8 stop: max attempts reached collected=${collected.size}")
+    }
+    return collected.values.toList()
   }
 
   private fun barcodesToCandidates(
@@ -178,15 +181,19 @@ class BarcodeExtractorImpl : BarcodeExtractor {
     roiHeight: Int
   ): List<BarcodeCandidate> {
     val dedup = LinkedHashMap<String, BarcodeCandidate>()
+    var filteredEmpty = 0
+    var filteredAllow = 0
 
     for (barcode in barcodes) {
       val value = barcode.rawValue?.trim()
       if (value.isNullOrEmpty()) {
+        filteredEmpty += 1
         continue
       }
 
       val format = normalizeFormat(barcode.format)
       if (allowedFormats.isNotEmpty() && !allowedFormats.contains(format)) {
+        filteredAllow += 1
         continue
       }
 
@@ -209,6 +216,10 @@ class BarcodeExtractorImpl : BarcodeExtractor {
         )
       }
     }
+
+    logTrace(
+      "attempt=$attemptIndex candidates dedup=${dedup.size} filteredEmpty=$filteredEmpty filteredAllow=$filteredAllow"
+    )
 
     return dedup.values.toList()
   }
@@ -294,12 +305,18 @@ class BarcodeExtractorImpl : BarcodeExtractor {
     val finalHeight = bottom - top
 
     if (finalWidth <= 1 || finalHeight <= 1) {
+      logTrace("cropTopRightRoi invalid final size ${finalWidth}x${finalHeight}")
       return null
     }
+
+    logTrace(
+      "cropTopRightRoi source=${width}x$height rect=($left,$top)-($right,$bottom)"
+    )
 
     return try {
       Bitmap.createBitmap(bitmap, left, top, finalWidth, finalHeight)
     } catch (_: IllegalArgumentException) {
+      logWarn("cropTopRightRoi createBitmap failed")
       null
     }
   }
@@ -312,6 +329,7 @@ class BarcodeExtractorImpl : BarcodeExtractor {
     return try {
       Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
     } catch (_: Exception) {
+      logWarn("rotateBitmap failed angle=$angle")
       null
     }
   }
@@ -334,7 +352,22 @@ class BarcodeExtractorImpl : BarcodeExtractor {
       val rest = requestedFormats.drop(1).toIntArray()
       optionsBuilder.setBarcodeFormats(first, *rest)
     }
+    logDebug(
+      "createScanner allowedFormats=${allowedFormats.sorted()} mlkitFormats=${requestedFormats.sorted()}"
+    )
 
     return BarcodeScanning.getClient(optionsBuilder.build())
+  }
+
+  override fun release() {
+    for ((key, scanner) in scannerCache) {
+      runCatching {
+        scanner.close()
+      }.onFailure { error ->
+        logWarn("release scanner key=$key failed: ${error.message}")
+      }
+    }
+    scannerCache.clear()
+    logDebug("release scanner cache cleared")
   }
 }
