@@ -2669,7 +2669,7 @@ __metadata:
     "@react-native-community/cli": "npm:18.0.0"
     "@react-native-community/cli-platform-android": "npm:18.0.0"
     "@react-native-community/cli-platform-ios": "npm:18.0.0"
-    "@react-native-documents/picker": "npm:^12.0.1"
+    "@react-native-documents/picker": "npm:^11.0.3"
     "@react-native/babel-preset": "npm:0.79.7"
     "@react-native/metro-config": "npm:0.79.7"
     "@react-native/typescript-config": "npm:0.79.7"
@@ -3061,13 +3061,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@react-native-documents/picker@npm:^12.0.1":
-  version: 12.0.1
-  resolution: "@react-native-documents/picker@npm:12.0.1"
+"@react-native-documents/picker@npm:^11.0.3":
+  version: 11.0.3
+  resolution: "@react-native-documents/picker@npm:11.0.3"
   peerDependencies:
     react: "*"
     react-native: ">=0.79.0"
-  checksum: 10c0/1077f80fdb76fcad283997f56a7f2eb263ace2a73da788e4b29dc926a78149c04a6eea1d4aeddef75c9f176fbbc9206a1c64c10c2d0c85c86cca85be023f7c00
+  checksum: 10c0/d7c2336bced7736b74d593f188419fe9b1497175e3707b63bee672300d9a05765145badf5114f7e6ff901208497dafd2e9107fd612281643628a0bed549a6278
   languageName: node
   linkType: hard
 

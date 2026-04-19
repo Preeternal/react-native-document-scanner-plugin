@@ -22,14 +22,7 @@ It is designed for apps that need more than “just scan a page”:
 
 ## Demo
 
-```md
-<video
-  src="https://github.com/user-attachments/assets/fda6d4d3-ac87-41d6-a04c-11f0ce08f5e8"
-  controls
-  muted
-  playsinline
-></video>
-```
+https://github.com/user-attachments/assets/fda6d4d3-ac87-41d6-a04c-11f0ce08f5e8
 
 ## Why this fork
 

@@ -1,6 +1,6 @@
 PODS:
   - boost (1.84.0)
-  - DocumentScanner (0.2.2):
+  - DocumentScanner (0.3.0):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -1356,7 +1356,7 @@ PODS:
     - React-jsiexecutor
     - React-RCTFBReactNativeSpec
     - ReactCommon/turbomodule/core
-  - react-native-document-picker (12.0.1):
+  - react-native-document-picker (11.0.3):
     - DoubleConversion
     - glog
     - hermes-engine
@@ -2039,7 +2039,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
-  DocumentScanner: ab4f56ed3b32b95c86df9f4ec53666064f5e354e
+  DocumentScanner: 6263e67b4009293bd1471fad908c4585cd44504d
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
   fast_float: 06eeec4fe712a76acc9376682e4808b05ce978b6
   FBLazyVector: b60fe06f0f15b7d7408f169442176e69e8eeacde
@@ -2077,7 +2077,7 @@ SPEC CHECKSUMS:
   React-logger: fbdc0814b62fefa412a90af7cacc666387f1bc9a
   React-Mapbuffer: cfe4726ba1929b9dab4645c78376a9165375d62f
   React-microtasksnativemodule: c99b8f1240609566de105b73f2569c0f22880ee1
-  react-native-document-picker: 686c62761cf3bbb914588c252eca45fc1991436c
+  react-native-document-picker: 169fadd7445c3930416cc3eb241dd4e1dabdae91
   react-native-image-picker: db0b3e3c7ae57680876318d4f42e7dbedd72244a
   react-native-safe-area-context: 26634d9b636a98ceee20cb6fa5dc946922f1e90f
   React-NativeModulesApple: 74051ff264ce0b89ac799b56314f8f440a95ee4d
