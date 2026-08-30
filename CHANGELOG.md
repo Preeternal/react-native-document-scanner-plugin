@@ -9,6 +9,11 @@
 - Updated the example to Android SDK 36, Java 17, Gradle 9.3.1, and the current RN 0.85 iOS project structure.
 - The iOS deployment target now follows `min_ios_version_supported` from React Native.
 
+### Added
+
+- Added Swift Package Manager support for iOS via `Package.swift` while retaining CocoaPods compatibility.
+- Added an RN 0.87 `example-spm` app and CI coverage for podless iOS integration with `npx react-native spm`.
+
 ### Changed
 
 - Updated the project to `create-react-native-library` 0.63.0 conventions, including Metro export conditions, Jest preset, TypeScript strict API conditions, Turborepo configuration, and native module registration.
