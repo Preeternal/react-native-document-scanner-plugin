@@ -60,7 +60,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
   NativeDocumentScannerSpec(reactContext) {
 
   companion object {
-    const val NAME = "DocumentScanner"
+    const val NAME = NativeDocumentScannerSpec.NAME
     private const val ANDROID_15_API = 35
     private const val BARCODE_EXTRACTION_TIMEOUT_MS = 10_000L
     private const val TEXT_EXTRACTION_TIMEOUT_MS = 25_000L

@@ -56,8 +56,7 @@ export interface ExtractBarcodesFromImagesOptions {
 /**
  * Native request shape for extractBarcodesFromImages.
  */
-export interface ExtractBarcodesFromImagesRequest
-  extends ExtractBarcodesFromImagesOptions {
+export interface ExtractBarcodesFromImagesRequest extends ExtractBarcodesFromImagesOptions {
   /**
    * Array of image sources. Each item can be a file path, file URI, or base64.
    */
@@ -92,8 +91,7 @@ export interface ExtractTextFromImagesOptions {
 /**
  * Native request shape for extractTextFromImages.
  */
-export interface ExtractTextFromImagesRequest
-  extends ExtractTextFromImagesOptions {
+export interface ExtractTextFromImagesRequest extends ExtractTextFromImagesOptions {
   /**
    * Array of image sources. Each item can be a file path, file URI, or base64.
    */
@@ -195,12 +193,7 @@ export type TableBlock = {
 };
 
 export type RegionType =
-  | 'header'
-  | 'footer'
-  | 'paragraph'
-  | 'signature'
-  | 'stamp'
-  | 'unknown';
+  'header' | 'footer' | 'paragraph' | 'signature' | 'stamp' | 'unknown';
 
 export type Region = {
   type: RegionType;
@@ -211,12 +204,7 @@ export type Region = {
 };
 
 export type StructuredEntityType =
-  | 'phone'
-  | 'email'
-  | 'date'
-  | 'amount'
-  | 'id'
-  | 'unknown';
+  'phone' | 'email' | 'date' | 'amount' | 'id' | 'unknown';
 
 export type StructuredEntity = {
   type: StructuredEntityType;
@@ -250,8 +238,7 @@ export type AnalyzeExtractOptions = {
 /**
  * Options for universal post-processing across scanned images.
  */
-export interface AnalyzeScannedImagesOptions
-  extends ExtractBarcodesFromImagesOptions {
+export interface AnalyzeScannedImagesOptions extends ExtractBarcodesFromImagesOptions {
   extract: AnalyzeExtractOptions;
 
   /**
@@ -272,8 +259,7 @@ export interface AnalyzeScannedImagesOptions
  * Native request shape for analyzeScannedImages.
  * Flattened to keep native codegen interop simple across architectures.
  */
-export interface AnalyzeScannedImagesRequest
-  extends ExtractBarcodesFromImagesOptions {
+export interface AnalyzeScannedImagesRequest extends ExtractBarcodesFromImagesOptions {
   images: string[];
   extractBarcodes?: boolean;
   extractText?: boolean;
@@ -291,10 +277,7 @@ export interface AnalyzeScannedImagesRequest
  * Status returned by universal post-processing.
  */
 export type AnalysisResultStatus =
-  | 'success'
-  | 'partial'
-  | 'failed'
-  | 'not_enabled';
+  'success' | 'partial' | 'failed' | 'not_enabled';
 
 /**
  * Universal post-processing response.
@@ -322,6 +305,16 @@ type ScanDocumentCancel = {
 export type ScanDocumentResponse = ScanDocumentSuccess | ScanDocumentCancel;
 
 /**
+ * Codegen-facing scan response. The public discriminated union above is kept
+ * separate because RN 0.85 Codegen does not accept enum member literals as
+ * object property types.
+ */
+type NativeScanDocumentResponse = {
+  status: string;
+  scannedImages: string[];
+};
+
+/**
  * Convenience options for one-shot scan + analysis.
  */
 export interface ScanAndAnalyzeDocumentOptions extends ScanDocumentOptions {
@@ -344,7 +337,9 @@ export interface Spec extends TurboModule {
    * @param options Scan options.
    * @returns Promise with scan result.
    */
-  scanDocument(options: ScanDocumentOptions): Promise<ScanDocumentResponse>;
+  scanDocument(
+    options: ScanDocumentOptions
+  ): Promise<NativeScanDocumentResponse>;
 
   /**
    * Extracts barcodes from existing images without opening scanner UI.

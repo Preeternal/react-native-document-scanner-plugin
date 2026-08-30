@@ -92,7 +92,7 @@ export function scanDocument(
   if (!options.responseType) {
     options.responseType = ResponseType.ImageFilePath;
   }
-  return DocumentScanner.scanDocument(options);
+  return DocumentScanner.scanDocument(options) as Promise<ScanDocumentResponse>;
 }
 
 /**
@@ -278,7 +278,7 @@ export async function analyzeScannedImages(
         textTimeoutMs: options.textTimeoutMs,
         ocrRotate180Fallback,
       });
-    } catch (_error) {
+    } catch {
       // Fallback for stale native artifacts.
     }
   }

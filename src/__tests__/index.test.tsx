@@ -1,3 +1,5 @@
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+
 import ScannerApi from '../index';
 import NativeScanner from '../NativeDocumentScanner';
 
@@ -24,9 +26,9 @@ jest.mock('../NativeDocumentScanner', () => {
 });
 
 const native = NativeScanner as unknown as {
-  extractBarcodesFromImages: jest.Mock;
-  extractTextFromImages: jest.Mock;
-  analyzeScannedImages: jest.Mock;
+  extractBarcodesFromImages: ReturnType<typeof jest.fn>;
+  extractTextFromImages: ReturnType<typeof jest.fn>;
+  analyzeScannedImages: ReturnType<typeof jest.fn>;
 };
 
 describe('public analysis API', () => {

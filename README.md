@@ -5,6 +5,8 @@
 
 React Native document scanning for **capture-first** and **analysis-ready** workflows.
 
+> Starting with `v0.4.0`, this package supports only React Native's New Architecture. Projects that still require the legacy bridge should stay on `v0.3.x`.
+
 This fork started as a maintained alternative to the original `react-native-document-scanner-plugin`, but it has grown beyond a compatibility fork.
 Today it gives you a clean separation between:
 
@@ -72,7 +74,7 @@ yarn add @preeternal/react-native-document-scanner-plugin
 
 ### iOS
 
-1. Open `ios/Podfile` and set `platform :ios` to `13` or higher.
+1. Make sure the app uses React Native's New Architecture and the minimum iOS version required by its React Native release.
 2. Add camera usage description to `Info.plist`:
    - `NSCameraUsageDescription`
 3. Install pods:

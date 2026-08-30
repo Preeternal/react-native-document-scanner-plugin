@@ -15,7 +15,6 @@
 @end
 
 @implementation DocumentScanner
-RCT_EXPORT_MODULE()
 
 - (instancetype)init
 {
@@ -59,7 +58,6 @@ RCT_EXPORT_MODULE()
   [self.impl invalidate];
 }
 
-#if RCT_NEW_ARCH_ENABLED
 - (void)scanDocument:(JS::NativeDocumentScanner::ScanDocumentOptions &)options
              resolve:(RCTPromiseResolveBlock)resolve
               reject:(RCTPromiseRejectBlock)reject
@@ -192,33 +190,10 @@ RCT_EXPORT_MODULE()
 {
   return std::make_shared<facebook::react::NativeDocumentScannerSpecJSI>(params);
 }
-#else
-RCT_EXPORT_METHOD(scanDocument:(NSDictionary *)options
-                  resolve:(RCTPromiseResolveBlock)resolve
-                  reject:(RCTPromiseRejectBlock)reject)
+
++ (NSString *)moduleName
 {
-  [self handleScanWithOptions:options resolve:resolve reject:reject];
+  return @"DocumentScanner";
 }
 
-RCT_EXPORT_METHOD(extractBarcodesFromImages:(NSDictionary *)options
-                  resolve:(RCTPromiseResolveBlock)resolve
-                  reject:(RCTPromiseRejectBlock)reject)
-{
-  [self handleBarcodeExtractionWithOptions:options resolve:resolve reject:reject];
-}
-
-RCT_EXPORT_METHOD(extractTextFromImages:(NSDictionary *)options
-                  resolve:(RCTPromiseResolveBlock)resolve
-                  reject:(RCTPromiseRejectBlock)reject)
-{
-  [self handleTextExtractionWithOptions:options resolve:resolve reject:reject];
-}
-
-RCT_EXPORT_METHOD(analyzeScannedImages:(NSDictionary *)options
-                  resolve:(RCTPromiseResolveBlock)resolve
-                  reject:(RCTPromiseRejectBlock)reject)
-{
-  [self handleAnalyzeWithOptions:options resolve:resolve reject:reject];
-}
-#endif
 @end
