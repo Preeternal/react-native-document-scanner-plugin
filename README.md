@@ -75,7 +75,7 @@ yarn add @preeternal/react-native-document-scanner-plugin
 ### iOS
 
 1. Make sure the app uses React Native's New Architecture and the minimum iOS version required by its React Native release.
-2. Add camera usage description to `Info.plist`:
+2. Add camera usage description to `Info.plist` (the Expo config plugin does this automatically):
    - `NSCameraUsageDescription`
 3. Choose the integration used by the app.
 
@@ -336,7 +336,8 @@ For Expo managed and bare workflows, use the built-in config plugin instead of e
       [
         "@preeternal/react-native-document-scanner-plugin",
         {
-          "analysisFeatures": "barcode,text"
+          "analysisFeatures": "barcode,text",
+          "cameraPermission": "Allow this app to scan documents"
         }
       ]
     ]
@@ -346,7 +347,9 @@ For Expo managed and bare workflows, use the built-in config plugin instead of e
 
 Accepted values for `analysisFeatures`: `barcode`, `text`, `tables`, comma-separated combinations, `all`, or `none` (default when omitted).
 
-The plugin writes `DocumentScanner_analysisFeatures` to `android/gradle.properties` during `expo prebuild` / EAS build. iOS requires no configuration — analysis features are always available.
+The optional `cameraPermission` value becomes `NSCameraUsageDescription`. If it is omitted, the plugin preserves an existing description or adds `Allow $(PRODUCT_NAME) to access your camera`.
+
+The plugin writes `DocumentScanner_analysisFeatures` to `android/gradle.properties` during `expo prebuild` / EAS build. iOS analysis features require no additional configuration — they are always available.
 
 ## iOS behavior: real device vs simulator
 

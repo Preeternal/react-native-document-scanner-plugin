@@ -14,6 +14,10 @@
 - Updated the project to `create-react-native-library` 0.63.0 conventions, including Metro export conditions, Jest preset, TypeScript strict API conditions, Turborepo configuration, and native module registration.
 - Preserved the example's scanner, barcode, OCR, semantic-analysis flows, and Android feature matrix.
 
+### Fixed
+
+- Restored automatic `NSCameraUsageDescription` configuration for Expo/EAS builds. The config plugin now accepts an optional `cameraPermission`, preserves an existing description, and otherwise supplies a default value.
+
 ## v0.3.0 – Capture + Analysis Pipeline Release
 
 ## Highlights
