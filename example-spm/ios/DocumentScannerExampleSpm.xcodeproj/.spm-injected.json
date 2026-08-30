@@ -181,7 +181,10 @@
   "generatedSources": {},
   "scriptPhases": {},
   "artifactsVersionOverride": null,
-  "configCommand": null,
+  "configCommand": [
+    "node",
+    "scripts/spm-autolinking-config.js"
+  ],
   "scheme": {
     "file": "DocumentScannerExampleSpm.xcscheme",
     "created": false

@@ -106,7 +106,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
 
   override fun scanDocument(options: ReadableMap, promise: Promise) {
     logDebug("scanDocument invoked")
-    val activity = currentActivity
+    val activity = reactApplicationContext.getCurrentActivity()
     if (activity == null) {
       promise.reject("no_activity", "Activity not available")
       return

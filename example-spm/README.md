@@ -11,10 +11,7 @@ For a fresh clone:
 
 ```sh
 yarn install
-cd ios
-npx react-native spm
-cd ..
-yarn ios
+yarn example:spm ios
 ```
 
 The initial CocoaPods-to-SPM migration has already been applied to the committed
@@ -59,10 +56,12 @@ yarn android
 Initialize React Native's SwiftPM integration after a fresh clone or in CI:
 
 ```sh
-cd ios
-npx react-native spm
-cd ..
+yarn example:spm spm:setup
 ```
+
+The repository carries `patch-package` manifests for dependencies that do not
+ship working SwiftPM support. The setup script then runs the integration with a
+Podfile-free React Native CLI config wrapper.
 
 ```sh
 # Using npm
@@ -72,7 +71,11 @@ npm run ios
 yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+The `ios` script performs SwiftPM setup and builds for a generic iOS Simulator.
+Open `ios/DocumentScannerExampleSpm.xcodeproj` in Xcode when you want to run it
+on a specific simulator or device; React Native CLI 20.2 still discovers Apple
+projects through Podfile lookup and cannot run this Podfile-free example
+directly.
 
 This is one way to run your app — you can also build it directly from Android Studio or Xcode.
 
