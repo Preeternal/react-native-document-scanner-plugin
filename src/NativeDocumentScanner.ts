@@ -2,6 +2,11 @@ import type { TurboModule } from 'react-native';
 import { TurboModuleRegistry } from 'react-native';
 
 /**
+ * Android document scanner feature set.
+ */
+export type DocumentScannerMode = 'base' | 'baseWithFilter' | 'full';
+
+/**
  * Options for document scanning.
  */
 export interface ScanDocumentOptions {
@@ -16,6 +21,21 @@ export interface ScanDocumentOptions {
    * @default undefined (no limit enforced by module)
    */
   maxNumDocuments?: number;
+
+  /**
+   * Android only: Whether the native scanner allows importing pages from the photo gallery.
+   * Disable this for workflows that require a newly captured image, such as KYC or proof-of-delivery.
+   * @default true
+   */
+  galleryImportAllowed?: boolean;
+
+  /**
+   * Android only: Controls the editing and cleanup features shown by the native scanner.
+   * `base` provides basic document capture/editing, `baseWithFilter` adds filters,
+   * and `full` also enables ML-powered cleanup.
+   * @default 'full'
+   */
+  scannerMode?: DocumentScannerMode;
 
   /**
    * The response format on success. Either file paths or base64 images.

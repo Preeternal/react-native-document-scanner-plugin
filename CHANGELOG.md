@@ -13,6 +13,10 @@
 
 - Added Swift Package Manager support for iOS via `Package.swift` while retaining CocoaPods compatibility.
 - Added an RN 0.87 `example-spm` app and CI coverage for podless iOS integration with `npx react-native spm`.
+- Added Android-only native scanner UI controls to `scanDocument(...)` and `scanAndAnalyzeDocument(...)`:
+  - `galleryImportAllowed` lets capture-sensitive workflows such as KYC, proof-of-delivery, and inspections require a newly captured image instead of accepting a gallery import. It defaults to `true`, preserving the existing scanner behavior.
+  - `scannerMode` selects ML Kit's `base`, `baseWithFilter`, or `full` feature set. It defaults to `full`, preserving the existing filters and ML-powered cleanup.
+  - Both options configure the existing Google scanner UI and do not add a custom camera implementation. iOS ignores them because VisionKit exposes no equivalent settings.
 
 ### Changed
 
@@ -22,6 +26,8 @@
 ### Fixed
 
 - Restored automatic `NSCameraUsageDescription` configuration for Expo/EAS builds. The config plugin now accepts an optional `cameraPermission`, preserves an existing description, and otherwise supplies a default value.
+
+---
 
 ## v0.3.0 – Capture + Analysis Pipeline Release
 

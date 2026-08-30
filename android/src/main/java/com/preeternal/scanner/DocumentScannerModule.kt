@@ -395,12 +395,27 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
   private fun initScanner(options: ReadableMap) {
     val builder = GmsDocumentScannerOptions.Builder()
       .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
-      .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
+      .setScannerMode(resolveScannerMode(getStringOrNull(options, "scannerMode")))
 
     if (options.hasKey("maxNumDocuments")) {
       builder.setPageLimit(options.getInt("maxNumDocuments"))
     }
+    if (options.hasKey("galleryImportAllowed")) {
+      builder.setGalleryImportAllowed(options.getBoolean("galleryImportAllowed"))
+    }
     scanner = GmsDocumentScanning.getClient(builder.build())
+  }
+
+  private fun resolveScannerMode(scannerMode: String?): Int {
+    return when (scannerMode) {
+      "base" -> GmsDocumentScannerOptions.SCANNER_MODE_BASE
+      "baseWithFilter" -> GmsDocumentScannerOptions.SCANNER_MODE_BASE_WITH_FILTER
+      null, "full" -> GmsDocumentScannerOptions.SCANNER_MODE_FULL
+      else -> {
+        logWarn("Unknown scannerMode=$scannerMode, falling back to full")
+        GmsDocumentScannerOptions.SCANNER_MODE_FULL
+      }
+    }
   }
 
   private fun initLauncher(activity: ComponentActivity) {
