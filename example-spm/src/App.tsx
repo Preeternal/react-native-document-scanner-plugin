@@ -141,7 +141,7 @@ function toAnalyzeOptions(
   extract: ExtractToggles,
   concurrency: 1 | 2,
   barcodeFormats: BarcodeFormatValue[],
-  ocrRotate180Fallback: boolean,
+  ocrRotate180Fallback: boolean
 ): AnalyzeScannedImagesOptions {
   return {
     extract,
@@ -204,14 +204,14 @@ function JsonCard(props: { title: string; value: unknown }) {
 function AppContent() {
   const insets = useSafeAreaInsets();
   const [responseType, setResponseType] = useState<ResponseType>(
-    ResponseType.ImageFilePath,
+    ResponseType.ImageFilePath
   );
   const [concurrency, setConcurrency] = useState<1 | 2>(2);
   const [ocrRotate180Fallback, setOcrRotate180Fallback] =
     useState<boolean>(true);
   const [extract, setExtract] = useState<ExtractToggles>(INITIAL_EXTRACT);
   const [barcodeFormats, setBarcodeFormats] = useState<BarcodeFormatValue[]>(
-    INITIAL_BARCODE_FORMATS,
+    INITIAL_BARCODE_FORMATS
   );
 
   const [activeAction, setActiveAction] = useState<ActionKey | null>(null);
@@ -221,7 +221,7 @@ function AppContent() {
   const [pageSource, setPageSource] = useState<PageSource | null>(null);
   const [scannedImages, setScannedImages] = useState<string[]>([]);
   const [imagesResponseType, setImagesResponseType] = useState<ResponseType>(
-    ResponseType.ImageFilePath,
+    ResponseType.ImageFilePath
   );
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
 
@@ -237,9 +237,9 @@ function AppContent() {
         extract,
         concurrency,
         barcodeFormats,
-        ocrRotate180Fallback,
+        ocrRotate180Fallback
       ),
-    [extract, concurrency, barcodeFormats, ocrRotate180Fallback],
+    [extract, concurrency, barcodeFormats, ocrRotate180Fallback]
   );
 
   const selectedImageSource = scannedImages[selectedImageIndex];
@@ -268,17 +268,17 @@ function AppContent() {
   };
 
   const toggleExtract = (name: keyof ExtractToggles) => {
-    setExtract(prev => ({
+    setExtract((prev) => ({
       ...prev,
       [name]: !prev[name],
     }));
   };
 
   const toggleBarcodeFormat = (format: BarcodeFormatValue) => {
-    setBarcodeFormats(prev =>
+    setBarcodeFormats((prev) =>
       prev.includes(format)
-        ? prev.filter(candidate => candidate !== format)
-        : [...prev, format],
+        ? prev.filter((candidate) => candidate !== format)
+        : [...prev, format]
     );
   };
 
@@ -332,8 +332,8 @@ function AppContent() {
       }
 
       const pickedUris = (response.assets ?? [])
-        .map(item =>
-          typeof item.uri === 'string' ? item.uri.trim() : undefined,
+        .map((item) =>
+          typeof item.uri === 'string' ? item.uri.trim() : undefined
         )
         .filter((uri): uri is string => !!uri);
 
@@ -368,7 +368,7 @@ function AppContent() {
           concurrency,
           barcodeFormats:
             barcodeFormats.length > 0 ? barcodeFormats : undefined,
-        },
+        }
       );
 
       setBarcodes(result);
@@ -387,7 +387,7 @@ function AppContent() {
         {
           concurrency,
           ocrRotate180Fallback,
-        },
+        }
       );
 
       setTextBlocks(result);
@@ -403,7 +403,7 @@ function AppContent() {
     await runAction('analyze', async () => {
       const result = await DocumentScanner.analyzeScannedImages(
         scannedImages,
-        analysisOptions,
+        analysisOptions
       );
 
       setAnalysis(result);
@@ -494,21 +494,23 @@ function AppContent() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>analyzeScannedImages extract</Text>
           <View style={styles.rowWrap}>
-            {(Object.keys(extract) as Array<keyof ExtractToggles>).map(key => (
-              <ToggleChip
-                key={key}
-                label={key}
-                active={extract[key]}
-                onPress={() => toggleExtract(key)}
-              />
-            ))}
+            {(Object.keys(extract) as Array<keyof ExtractToggles>).map(
+              (key) => (
+                <ToggleChip
+                  key={key}
+                  label={key}
+                  active={extract[key]}
+                  onPress={() => toggleExtract(key)}
+                />
+              )
+            )}
           </View>
 
           <Text style={styles.label}>
             barcodeFormats allow-list (empty = all)
           </Text>
           <View style={styles.rowWrap}>
-            {BARCODE_FORMAT_OPTIONS.map(format => (
+            {BARCODE_FORMAT_OPTIONS.map((format) => (
               <ToggleChip
                 key={format}
                 label={format}

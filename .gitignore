@@ -88,3 +88,6 @@ nitrogen/
 
 #Temp files
 *.tmp
+
+# Tests
+coverage/

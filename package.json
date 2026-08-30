@@ -42,10 +42,11 @@
   ],
   "scripts": {
     "example": "yarn workspace @preeternal/react-native-document-scanner-plugin-example",
+    "example:spm": "yarn workspace @preeternal/react-native-document-scanner-plugin-example-spm",
     "test": "jest",
-    "typecheck": "tsc",
+    "typecheck": "tsc && yarn workspace @preeternal/react-native-document-scanner-plugin-example-spm typecheck",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
-    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
+    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build example-spm/android/build example-spm/android/app/build example-spm/ios/build lib",
     "prepare": "bob build",
     "release": "release-it --only-version"
   },
@@ -99,7 +100,8 @@
     "react-native": "*"
   },
   "workspaces": [
-    "example"
+    "example",
+    "example-spm"
   ],
   "resolutions": {
     "@react-native-documents/picker": "11.0.3"
@@ -114,8 +116,12 @@
         "preeternal-react-native-document-scanner-plugin-source"
       ]
     },
+    "moduleNameMapper": {
+      "^@preeternal/react-native-document-scanner-plugin$": "<rootDir>/src/index.tsx"
+    },
     "modulePathIgnorePatterns": [
       "<rootDir>/example/node_modules",
+      "<rootDir>/example-spm/node_modules",
       "<rootDir>/lib/"
     ]
   },
