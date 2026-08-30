@@ -77,11 +77,41 @@ yarn add @preeternal/react-native-document-scanner-plugin
 1. Make sure the app uses React Native's New Architecture and the minimum iOS version required by its React Native release.
 2. Add camera usage description to `Info.plist`:
    - `NSCameraUsageDescription`
-3. Install pods:
+3. Choose the integration used by the app.
+
+#### CocoaPods (default)
+
+React Native still selects CocoaPods by default. This library keeps its podspec,
+so existing apps and React Native versions before 0.87 continue to install it normally:
 
 ```bash
 cd ios && bundle exec pod install && cd ..
 ```
+
+#### Swift Package Manager (React Native 0.87+)
+
+The library also ships a self-managed `Package.swift`. React Native 0.87's
+SwiftPM app integration is experimental and opt-in; CocoaPods remains the
+default and supported production path.
+
+To migrate an app once:
+
+```bash
+cd ios
+npx react-native spm --deintegrate
+```
+
+After a fresh clone or in CI, initialize the generated SwiftPM workspace before
+building:
+
+```bash
+cd ios
+npx react-native spm
+```
+
+Every other native dependency in the app must also ship a compatible
+`Package.swift`, or have a reproducible manifest generated with
+`npx react-native spm scaffold` and persisted as a package patch.
 
 ### Android
 

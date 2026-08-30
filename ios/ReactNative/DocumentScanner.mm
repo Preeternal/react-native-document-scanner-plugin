@@ -1,14 +1,26 @@
 #import "DocumentScanner.h"
+#import <React/RCTUtils.h>
+#import <UIKit/UIKit.h>
 #import <VisionKit/VisionKit.h>
 
-// Universal for different modes (framework/static)
-#if __has_include(<DocumentScanner/DocumentScanner-Swift.h>)
-#import <DocumentScanner/DocumentScanner-Swift.h>
-#elif __has_include("DocumentScanner-Swift.h")
-#import "DocumentScanner-Swift.h"
-#else
-#warning "DocumentScanner-Swift.h not found at build time"
-#endif
+// Keep the RN adapter independent of Swift's generated header. CocoaPods and
+// SwiftPM expose that header differently, while the Objective-C ABI is stable.
+@interface DocumentScannerImpl : NSObject
+- (void)scanDocument:(NSDictionary *)options
+    presentingViewController:(UIViewController *)presentingViewController
+                    resolve:(RCTPromiseResolveBlock)resolve
+                     reject:(RCTPromiseRejectBlock)reject;
+- (void)extractBarcodesFromImages:(NSDictionary *)options
+                          resolve:(RCTPromiseResolveBlock)resolve
+                           reject:(RCTPromiseRejectBlock)reject;
+- (void)extractTextFromImages:(NSDictionary *)options
+                      resolve:(RCTPromiseResolveBlock)resolve
+                       reject:(RCTPromiseRejectBlock)reject;
+- (void)analyzeScannedImages:(NSDictionary *)options
+                     resolve:(RCTPromiseResolveBlock)resolve
+                      reject:(RCTPromiseRejectBlock)reject;
+- (void)invalidate;
+@end
 
 @interface DocumentScanner ()
 @property (nonatomic, strong) DocumentScannerImpl *impl;
@@ -29,7 +41,10 @@
                       resolve:(RCTPromiseResolveBlock)resolve
                        reject:(RCTPromiseRejectBlock)reject
 {
-  [self.impl scanDocument:options resolve:resolve reject:reject];
+  [self.impl scanDocument:options
+      presentingViewController:RCTPresentedViewController()
+                      resolve:resolve
+                       reject:reject];
 }
 
 - (void)handleBarcodeExtractionWithOptions:(NSDictionary *)options

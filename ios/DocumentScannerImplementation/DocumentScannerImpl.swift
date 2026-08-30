@@ -1,6 +1,8 @@
 import Foundation
 import UIKit
-import React
+
+public typealias DocumentScannerResolveBlock = (Any?) -> Void
+public typealias DocumentScannerRejectBlock = (String?, String?, NSError?) -> Void
 
 @objc(DocumentScannerImpl)
 public class DocumentScannerImpl: NSObject {
@@ -31,11 +33,12 @@ public class DocumentScannerImpl: NSObject {
 
   @objc static func requiresMainQueueSetup() -> Bool { true }
 
-  @objc(scanDocument:resolve:reject:)
+  @objc(scanDocument:presentingViewController:resolve:reject:)
   public func scanDocument(
     _ options: NSDictionary,
-    resolve: @escaping RCTPromiseResolveBlock,
-    reject: @escaping RCTPromiseRejectBlock
+    presentingViewController: UIViewController?,
+    resolve: @escaping DocumentScannerResolveBlock,
+    reject: @escaping DocumentScannerRejectBlock
   ) {
     log("scanDocument", "invoked")
     guard #available(iOS 13.0, *) else {
@@ -55,7 +58,7 @@ public class DocumentScannerImpl: NSObject {
     DispatchQueue.main.async {
       self.docScanner = DocScanner()
       self.docScanner?.startScan(
-        RCTPresentedViewController(),
+        presentingViewController,
         successHandler: { (scannedData: [[String: Any]]) in
           self.log("scanDocument", "native scanner returned pages=\(scannedData.count)")
           let fm = FileManager.default
@@ -111,8 +114,8 @@ public class DocumentScannerImpl: NSObject {
   @objc(extractBarcodesFromImages:resolve:reject:)
   public func extractBarcodesFromImages(
     _ options: NSDictionary,
-    resolve: @escaping RCTPromiseResolveBlock,
-    reject: @escaping RCTPromiseRejectBlock
+    resolve: @escaping DocumentScannerResolveBlock,
+    reject: @escaping DocumentScannerRejectBlock
   ) {
     log("extractBarcodesFromImages", "invoked")
     guard #available(iOS 13.0, *) else {
@@ -200,8 +203,8 @@ public class DocumentScannerImpl: NSObject {
   @objc(extractTextFromImages:resolve:reject:)
   public func extractTextFromImages(
     _ options: NSDictionary,
-    resolve: @escaping RCTPromiseResolveBlock,
-    reject: @escaping RCTPromiseRejectBlock
+    resolve: @escaping DocumentScannerResolveBlock,
+    reject: @escaping DocumentScannerRejectBlock
   ) {
     log("extractTextFromImages", "invoked")
     guard #available(iOS 13.0, *) else {
@@ -261,8 +264,8 @@ public class DocumentScannerImpl: NSObject {
   @objc(analyzeScannedImages:resolve:reject:)
   public func analyzeScannedImages(
     _ options: NSDictionary,
-    resolve: @escaping RCTPromiseResolveBlock,
-    reject: @escaping RCTPromiseRejectBlock
+    resolve: @escaping DocumentScannerResolveBlock,
+    reject: @escaping DocumentScannerRejectBlock
   ) {
     log("analyzeScannedImages", "invoked")
     guard #available(iOS 13.0, *) else {

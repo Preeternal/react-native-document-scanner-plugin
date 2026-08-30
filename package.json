@@ -26,6 +26,7 @@
     "ios",
     "cpp",
     "app.plugin.js",
+    "Package.swift",
     "*.podspec",
     "react-native.config.js",
     "!ios/build",
