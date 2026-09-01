@@ -1,0 +1,14 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "customConditions": [
+      "preeternal-react-native-document-scanner-plugin-source",
+      "react-native-strict-api"
+    ],
+    "paths": {
+      "@preeternal/react-native-document-scanner-plugin": ["../src/index"]
+    }
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["**/node_modules", "**/Pods", "ios/build"]
+}

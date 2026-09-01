@@ -60,7 +60,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
   NativeDocumentScannerSpec(reactContext) {
 
   companion object {
-    const val NAME = "DocumentScanner"
+    const val NAME = NativeDocumentScannerSpec.NAME
     private const val ANDROID_15_API = 35
     private const val BARCODE_EXTRACTION_TIMEOUT_MS = 10_000L
     private const val TEXT_EXTRACTION_TIMEOUT_MS = 25_000L
@@ -106,7 +106,7 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
 
   override fun scanDocument(options: ReadableMap, promise: Promise) {
     logDebug("scanDocument invoked")
-    val activity = currentActivity
+    val activity = reactApplicationContext.getCurrentActivity()
     if (activity == null) {
       promise.reject("no_activity", "Activity not available")
       return
@@ -395,12 +395,27 @@ class DocumentScannerModule(reactContext: ReactApplicationContext) :
   private fun initScanner(options: ReadableMap) {
     val builder = GmsDocumentScannerOptions.Builder()
       .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
-      .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
+      .setScannerMode(resolveScannerMode(getStringOrNull(options, "scannerMode")))
 
     if (options.hasKey("maxNumDocuments")) {
       builder.setPageLimit(options.getInt("maxNumDocuments"))
     }
+    if (options.hasKey("galleryImportAllowed")) {
+      builder.setGalleryImportAllowed(options.getBoolean("galleryImportAllowed"))
+    }
     scanner = GmsDocumentScanning.getClient(builder.build())
+  }
+
+  private fun resolveScannerMode(scannerMode: String?): Int {
+    return when (scannerMode) {
+      "base" -> GmsDocumentScannerOptions.SCANNER_MODE_BASE
+      "baseWithFilter" -> GmsDocumentScannerOptions.SCANNER_MODE_BASE_WITH_FILTER
+      null, "full" -> GmsDocumentScannerOptions.SCANNER_MODE_FULL
+      else -> {
+        logWarn("Unknown scannerMode=$scannerMode, falling back to full")
+        GmsDocumentScannerOptions.SCANNER_MODE_FULL
+      }
+    }
   }
 
   private fun initLauncher(activity: ComponentActivity) {

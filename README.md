@@ -5,6 +5,8 @@
 
 React Native document scanning for **capture-first** and **analysis-ready** workflows.
 
+> Starting with `v0.4.0`, this package supports only React Native's New Architecture. Projects that still require the legacy bridge should stay on `v0.3.x`.
+
 This fork started as a maintained alternative to the original `react-native-document-scanner-plugin`, but it has grown beyond a compatibility fork.
 Today it gives you a clean separation between:
 
@@ -70,21 +72,97 @@ Use your own or third-party tooling for final document authoring such as advance
 yarn add @preeternal/react-native-document-scanner-plugin
 ```
 
-### iOS
+### iOS installation
 
-1. Open `ios/Podfile` and set `platform :ios` to `13` or higher.
-2. Add camera usage description to `Info.plist`:
+1. Make sure the app uses React Native's New Architecture and the minimum iOS version required by its React Native release.
+2. Add camera usage description to `Info.plist` (the Expo config plugin does this automatically; see [Camera permissions](#camera-permissions)):
    - `NSCameraUsageDescription`
-3. Install pods:
+3. Choose the integration used by the app.
+
+#### CocoaPods (default)
+
+React Native still selects CocoaPods by default. This library keeps its podspec,
+so existing apps and React Native versions before 0.87 continue to install it normally:
 
 ```bash
 cd ios && bundle exec pod install && cd ..
 ```
 
-### Android
+#### Swift Package Manager (React Native 0.87+)
 
-You do not need to request camera permission unless another plugin adds camera permission requirements to your app manifest.
-See [Android Camera Permissions](#android-camera-permissions) below.
+The library also ships a self-managed `Package.swift`. React Native 0.87's
+SwiftPM app integration is experimental and opt-in; CocoaPods remains the
+default and supported production path.
+
+To migrate an app once:
+
+```bash
+cd ios
+npx react-native spm --deintegrate
+```
+
+After a fresh clone or in CI, initialize the generated SwiftPM workspace before
+building:
+
+```bash
+cd ios
+npx react-native spm
+```
+
+Every other native dependency in the app must also ship a compatible
+`Package.swift`, or have a reproducible manifest generated with
+`npx react-native spm scaffold` and persisted as a package patch.
+
+### Android installation
+
+The Google ML Kit document scanner does not require your app to declare or
+request Android camera permission. Camera access performed independently by
+your app or another dependency has its own permission requirements.
+See [Camera permissions](#camera-permissions) below.
+
+## Camera permissions
+
+Camera permission requirements differ by platform and by whether you open the
+scanner UI or only analyze existing images.
+
+### iOS permission
+
+`scanDocument()` presents Apple's `VNDocumentCameraViewController`, which
+accesses the camera on behalf of your app. The app must therefore include
+`NSCameraUsageDescription` in `Info.plist`. iOS may terminate an app that opens
+the camera without this usage description.
+
+For a bare React Native app that does not run the Expo config plugin, add the
+key manually:
+
+```xml
+<key>NSCameraUsageDescription</key>
+<string>Allow this app to scan documents</string>
+```
+
+Expo/EAS projects get this key from the built-in config plugin; see
+[Expo / EAS configuration](#expo--eas-configuration).
+
+The image-analysis APIs do not access the camera. An app that only calls
+`extractBarcodesFromImages()`, `extractTextFromImages()`, or
+`analyzeScannedImages()` does not need camera permission for those operations.
+
+### Android permissions
+
+`scanDocument()` runs through Google ML Kit and Google Play services. This
+library does not declare `android.permission.CAMERA`, and your app does not need
+to add or request it before opening the document scanner.
+
+The Android-only `galleryImportAllowed` and `scannerMode` options configure the
+existing Google scanner flow and do not change its permission requirements.
+Barcode extraction, OCR, and semantic analysis over existing images also do not
+require camera permission.
+
+If your application or another dependency accesses the camera directly, follow
+that camera integration's permission requirements independently.
+
+The Expo config plugin does not add Android camera permission. Its
+`analysisFeatures` setting only controls optional analysis dependencies.
 
 ## Quick start
 
@@ -293,7 +371,7 @@ Accepted values:
 
 If a feature is not enabled in the Android native build, the corresponding API returns `not_enabled` style behavior or rejects with a feature-specific error such as `barcode_not_enabled`.
 
-### Expo / EAS: configure via app.json
+### Expo / EAS configuration
 
 For Expo managed and bare workflows, use the built-in config plugin instead of editing `gradle.properties` manually:
 
@@ -304,7 +382,8 @@ For Expo managed and bare workflows, use the built-in config plugin instead of e
       [
         "@preeternal/react-native-document-scanner-plugin",
         {
-          "analysisFeatures": "barcode,text"
+          "analysisFeatures": "barcode,text",
+          "cameraPermission": "Allow this app to scan documents"
         }
       ]
     ]
@@ -314,7 +393,9 @@ For Expo managed and bare workflows, use the built-in config plugin instead of e
 
 Accepted values for `analysisFeatures`: `barcode`, `text`, `tables`, comma-separated combinations, `all`, or `none` (default when omitted).
 
-The plugin writes `DocumentScanner_analysisFeatures` to `android/gradle.properties` during `expo prebuild` / EAS build. iOS requires no configuration — analysis features are always available.
+The optional `cameraPermission` value becomes `NSCameraUsageDescription`. If it is omitted, the plugin preserves an existing description or adds `Allow $(PRODUCT_NAME) to access your camera`.
+
+The plugin writes `DocumentScanner_analysisFeatures` to `android/gradle.properties` during `expo prebuild` / EAS build. iOS analysis features require no additional configuration — they are always available.
 
 ## iOS behavior: real device vs simulator
 
@@ -377,7 +458,7 @@ if (status === 'success' && scannedImages.length > 0) {
 - [Response sanitization](#response-sanitization)
 - [Interfaces](#interfaces)
 - [Enums](#enums)
-- [Android Camera Permissions](#android-camera-permissions)
+- [Camera permissions](#camera-permissions)
 
 ### scanDocument(...)
 
@@ -386,6 +467,30 @@ scanDocument(options?: ScanDocumentOptions | undefined) => Promise<ScanDocumentR
 ```
 
 Opens native camera UI and starts document scanning.
+
+#### Android native scanner options
+
+By default, the Android scanner allows gallery import and uses ML Kit's `full`
+feature set. Restrict those capabilities only when your workflow needs it:
+
+```ts
+const result = await DocumentScanner.scanDocument({
+  galleryImportAllowed: false,
+  scannerMode: 'baseWithFilter',
+})
+```
+
+`galleryImportAllowed: false` requires capture during the current session, which
+is useful for KYC, proof-of-delivery, or inspections.
+
+| `scannerMode`    | Native scanner features                         |
+| ---------------- | ----------------------------------------------- |
+| `base`           | Capture and basic page editing                  |
+| `baseWithFilter` | Base features plus image filters                |
+| `full`           | Filters plus ML cleanup; default                 |
+
+Both options are Android-only, configure the existing Google scanner UI, and do
+not change camera permission requirements.
 
 | Param         | Type                                                                |
 | ------------- | ------------------------------------------------------------------- |
@@ -504,6 +609,8 @@ const result = await DocumentScanner.scanAndAnalyzeDocument({
 
 - `croppedImageQuality`: `number` — Cropped image quality from `0` to `100`. Default: `100`.
 - `maxNumDocuments`: `number` — Android only: maximum number of captured pages. Default: `undefined`.
+- `galleryImportAllowed`: `boolean` — Android only: show or hide gallery import in the native scanner. Default: `true`. Disable it when the workflow requires a newly captured image.
+- `scannerMode`: `'base' | 'baseWithFilter' | 'full'` — Android only: select basic editing, editing with filters, or the complete ML cleanup toolset. Default: `'full'`.
 - `responseType`: [`ResponseType`](#responsetype) — Result format on success. Default: `ResponseType.ImageFilePath`.
 
 ### ExtractBarcodesFromImagesOptions
@@ -547,10 +654,8 @@ const result = await DocumentScanner.scanAndAnalyzeDocument({
 
 ### ScanAndAnalyzeDocumentOptions
 
+- Includes all [`ScanDocumentOptions`](#scandocumentoptions).
 - `analysis`: [`AnalyzeScannedImagesOptions`](#analyzescannedimagesoptions) — Analysis options for post-processing.
-- `croppedImageQuality`: `number` — Same as `ScanDocumentOptions`.
-- `maxNumDocuments`: `number` — Same as `ScanDocumentOptions` (Android only).
-- `responseType`: [`ResponseType`](#responsetype) — Same as `ScanDocumentOptions`.
 
 ### ScanAndAnalyzeDocumentResponse
 
@@ -618,63 +723,6 @@ Best-effort quality note:
 | :-------------- | :---------------- | :----------------------------------------------- |
 | `Base64`        | `'base64'`        | Return scanned images as base64 strings.         |
 | `ImageFilePath` | `'imageFilePath'` | Return scanned images as image file paths.       |
-
-## Common mistakes
-
-### Android Camera Permissions
-
-You do not need to request camera permissions unless another camera plugin adds:
-
-```xml
-<uses-permission android:name="android.permission.CAMERA" />
-```
-
-If that permission is present and not granted, you can get errors like:
-
-```txt
-Error: error - error opening camera: Permission Denial: starting Intent { act=android.media.action.IMAGE_CAPTURE
-```
-
-Example permission request flow:
-
-```tsx
-import React, { useEffect, useState } from 'react'
-import { Alert, Image, PermissionsAndroid, Platform } from 'react-native'
-import DocumentScanner from '@preeternal/react-native-document-scanner-plugin'
-
-export default function App() {
-  const [image, setImage] = useState<string | undefined>()
-
-  useEffect(() => {
-    const run = async () => {
-      if (
-        Platform.OS === 'android' &&
-        (await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA)) !==
-          PermissionsAndroid.RESULTS.GRANTED
-      ) {
-        Alert.alert('Error', 'User must grant camera permissions to use document scanner.')
-        return
-      }
-
-      const { status, scannedImages } = await DocumentScanner.scanDocument()
-
-      if (status === 'success' && scannedImages.length > 0) {
-        setImage(scannedImages[0])
-      }
-    }
-
-    run()
-  }, [])
-
-  return (
-    <Image
-      resizeMode="contain"
-      style={{ width: '100%', height: '100%' }}
-      source={image ? { uri: image } : undefined}
-    />
-  )
-}
-```
 
 ## Migrating between upstream and this fork
 

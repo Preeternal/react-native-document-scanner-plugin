@@ -1,5 +1,33 @@
 # Releases
 
+## v0.4.0 New Architecture & Swift Package Manager
+
+### Breaking changes
+
+- Removed the legacy React Native bridge implementation. The package is now New Architecture-only.
+- The iOS deployment target now follows `min_ios_version_supported` from React Native.
+
+### Added
+
+- Added Swift Package Manager support for iOS via `Package.swift` while retaining CocoaPods compatibility.
+- Added an RN 0.87 `example-spm` app and CI coverage for podless iOS integration with `npx react-native spm`.
+- Added Android-only native scanner UI controls to `scanDocument(...)` and `scanAndAnalyzeDocument(...)`:
+  - `galleryImportAllowed` lets capture-sensitive workflows such as KYC, proof-of-delivery, and inspections require a newly captured image instead of accepting a gallery import. It defaults to `true`, preserving the existing scanner behavior.
+  - `scannerMode` selects ML Kit's `base`, `baseWithFilter`, or `full` feature set. It defaults to `full`, preserving the existing filters and ML-powered cleanup.
+  - Both options configure the existing Google scanner UI and do not add a custom camera implementation. iOS ignores them because VisionKit exposes no equivalent settings.
+
+### Changed
+
+- Updated the main example and development toolchain to React Native 0.85 and React 19.2.
+- Updated the example to Android SDK 36, Java 17, Gradle 9.3.1, and the current RN 0.85 iOS project structure.
+- Updated the project to `create-react-native-library` 0.63.0 conventions, including Metro export conditions, Jest preset, TypeScript strict API conditions, Turborepo configuration, and native module registration.
+
+### Fixed
+
+- Restored automatic `NSCameraUsageDescription` configuration for Expo/EAS builds. The config plugin now accepts an optional `cameraPermission`, preserves an existing description, and otherwise supplies a default value.
+
+---
+
 ## v0.3.0 – Capture + Analysis Pipeline Release
 
 ## Highlights

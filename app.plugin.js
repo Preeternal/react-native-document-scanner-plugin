@@ -9,11 +9,17 @@ try {
   configPlugins = require('expo/config-plugins');
 }
 
-const { createRunOncePlugin } = configPlugins;
+const { createRunOncePlugin, withInfoPlist } = configPlugins;
 const withAndroidGradleProperties =
   typeof configPlugins.withAndroidGradleProperties === 'function'
     ? configPlugins.withAndroidGradleProperties
     : configPlugins.withGradleProperties;
+
+if (typeof withInfoPlist !== 'function') {
+  throw new Error(
+    `${pkg.name}: incompatible expo config-plugins API (missing Info.plist helper).`
+  );
+}
 
 if (typeof withAndroidGradleProperties !== 'function') {
   throw new Error(
@@ -23,6 +29,7 @@ if (typeof withAndroidGradleProperties !== 'function') {
 
 const VALID_FEATURES = new Set(['barcode', 'text', 'tables']);
 const PROPERTY_KEY = 'DocumentScanner_analysisFeatures';
+const CAMERA_USAGE = 'Allow $(PRODUCT_NAME) to access your camera';
 
 function normalizeAnalysisFeatures(raw) {
   if (raw == null || raw === '') {
@@ -55,8 +62,18 @@ function normalizeAnalysisFeatures(raw) {
   return features.join(',');
 }
 
-function withDocumentScannerAnalysisFeatures(config, props = {}) {
+function withDocumentScanner(config, props = {}) {
   const analysisFeatures = normalizeAnalysisFeatures(props.analysisFeatures);
+  const cameraPermission = props.cameraPermission;
+
+  config = withInfoPlist(config, (mod) => {
+    mod.modResults.NSCameraUsageDescription =
+      cameraPermission ||
+      mod.modResults.NSCameraUsageDescription ||
+      CAMERA_USAGE;
+
+    return mod;
+  });
 
   return withAndroidGradleProperties(config, (mod) => {
     const existing = mod.modResults.find(
@@ -78,7 +95,7 @@ function withDocumentScannerAnalysisFeatures(config, props = {}) {
 }
 
 module.exports = createRunOncePlugin(
-  withDocumentScannerAnalysisFeatures,
+  withDocumentScanner,
   pkg.name,
   pkg.version
 );
