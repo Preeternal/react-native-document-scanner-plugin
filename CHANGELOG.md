@@ -1,12 +1,10 @@
 # Releases
 
-## v0.4.0 (Unreleased)
+## v0.4.0 New Architecture & Swift Package Manager
 
 ### Breaking changes
 
-- Updated the development and example toolchain to React Native 0.85 and React 19.2.
 - Removed the legacy React Native bridge implementation. The package is now New Architecture-only.
-- Updated the example to Android SDK 36, Java 17, Gradle 9.3.1, and the current RN 0.85 iOS project structure.
 - The iOS deployment target now follows `min_ios_version_supported` from React Native.
 
 ### Added
@@ -20,8 +18,9 @@
 
 ### Changed
 
+- Updated the main example and development toolchain to React Native 0.85 and React 19.2.
+- Updated the example to Android SDK 36, Java 17, Gradle 9.3.1, and the current RN 0.85 iOS project structure.
 - Updated the project to `create-react-native-library` 0.63.0 conventions, including Metro export conditions, Jest preset, TypeScript strict API conditions, Turborepo configuration, and native module registration.
-- Preserved the example's scanner, barcode, OCR, semantic-analysis flows, and Android feature matrix.
 
 ### Fixed
 
