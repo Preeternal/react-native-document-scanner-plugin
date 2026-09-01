@@ -1,6 +1,6 @@
 # Releases
 
-## v0.4.0 New Architecture & Swift Package Manager
+## v0.4.1 New Architecture & Swift Package Manager
 
 ### Breaking changes
 
