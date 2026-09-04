@@ -1,5 +1,15 @@
 # Releases
 
+---
+
+## v0.4.2 AGP 9 Kotlin compatibility fix
+
+### Fixed
+
+- Android: Fix a Kotlin plugin conflict when building with AGP 9’s built-in Kotlin support enabled, while preserving compatibility with AGP 8.
+
+---
+
 ## v0.4.1 New Architecture & Swift Package Manager
 
 ### Breaking changes
