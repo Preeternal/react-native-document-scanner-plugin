@@ -2,7 +2,7 @@
 
 ---
 
-## v0.4.3 (Unreleased) — SwiftPM setup fixes
+## v0.4.3 — SwiftPM setup fixes
 
 - The React Native 0.87 example now refreshes SwiftPM packages whenever you
   build or run iOS. A fresh checkout needs no separate setup command.
