@@ -8,14 +8,14 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		17CA21E30A8FFCB9D0FC1E35 /* ReactNativeHeaders in Frameworks */ = {isa = PBXBuildFile; productRef = 920F69A9DF98D37C8308D020 /* ReactNativeHeaders */; };
+		3F1E298E4A2D7CA403A328B5 /* ReactCodegen in Frameworks */ = {isa = PBXBuildFile; productRef = 947DD5EF3BE079FB7F5AFF87 /* ReactCodegen */; };
+		50A8621D202A6CFB97E2C1B5 /* ReactAppDependencyProvider in Frameworks */ = {isa = PBXBuildFile; productRef = F3857EDDA38AFC0011322D6D /* ReactAppDependencyProvider */; };
+		69A7AB74931112BD2779B631 /* ReactNativeDependenciesHeaders in Frameworks */ = {isa = PBXBuildFile; productRef = 8332BE36B9C49BD2E49347C1 /* ReactNativeDependenciesHeaders */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
-		94F7C9B714A718310DA6BE9C /* ReactHeaders in Frameworks */ = {isa = PBXBuildFile; productRef = 512EBECF5434FD7A6AF7C967 /* ReactHeaders */;};
-		17CA21E30A8FFCB9D0FC1E35 /* ReactNativeHeaders in Frameworks */ = {isa = PBXBuildFile; productRef = 920F69A9DF98D37C8308D020 /* ReactNativeHeaders */;};
-		69A7AB74931112BD2779B631 /* ReactNativeDependenciesHeaders in Frameworks */ = {isa = PBXBuildFile; productRef = 8332BE36B9C49BD2E49347C1 /* ReactNativeDependenciesHeaders */;};
-		D6BD17EA9023C9F39246B71F /* Autolinked in Frameworks */ = {isa = PBXBuildFile; productRef = 3AFDEFB917B01458307FDE0A /* Autolinked */;};
-		3F1E298E4A2D7CA403A328B5 /* ReactCodegen in Frameworks */ = {isa = PBXBuildFile; productRef = 947DD5EF3BE079FB7F5AFF87 /* ReactCodegen */;};
-		50A8621D202A6CFB97E2C1B5 /* ReactAppDependencyProvider in Frameworks */ = {isa = PBXBuildFile; productRef = F3857EDDA38AFC0011322D6D /* ReactAppDependencyProvider */;};
+		94F7C9B714A718310DA6BE9C /* ReactHeaders in Frameworks */ = {isa = PBXBuildFile; productRef = 512EBECF5434FD7A6AF7C967 /* ReactHeaders */; };
+		D6BD17EA9023C9F39246B71F /* Autolinked in Frameworks */ = {isa = PBXBuildFile; productRef = 3AFDEFB917B01458307FDE0A /* Autolinked */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,13 +56,6 @@
 			name = DocumentScannerExampleSpm;
 			sourceTree = "<group>";
 		};
-		2D16E6871FA4F8E400B85C8A /* Frameworks */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			name = Frameworks;
-			sourceTree = "<group>";
-		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
 			isa = PBXGroup;
 			children = (
@@ -76,7 +69,6 @@
 				13B07FAE1A68108700A75B9A /* DocumentScannerExampleSpm */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				83CBBA001A601CBA00E9B192 /* Products */,
-				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -95,14 +87,6 @@
 
 /* Begin PBXNativeTarget section */
 		13B07F861A680F5B00A75B9A /* DocumentScannerExampleSpm */ = {
-			packageProductDependencies = (
-				512EBECF5434FD7A6AF7C967 /* ReactHeaders */,
-				920F69A9DF98D37C8308D020 /* ReactNativeHeaders */,
-				8332BE36B9C49BD2E49347C1 /* ReactNativeDependenciesHeaders */,
-				3AFDEFB917B01458307FDE0A /* Autolinked */,
-				947DD5EF3BE079FB7F5AFF87 /* ReactCodegen */,
-				F3857EDDA38AFC0011322D6D /* ReactAppDependencyProvider */,
-			);
 			isa = PBXNativeTarget;
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "DocumentScannerExampleSpm" */;
 			buildPhases = (
@@ -118,6 +102,14 @@
 			dependencies = (
 			);
 			name = DocumentScannerExampleSpm;
+			packageProductDependencies = (
+				512EBECF5434FD7A6AF7C967 /* ReactHeaders */,
+				920F69A9DF98D37C8308D020 /* ReactNativeHeaders */,
+				8332BE36B9C49BD2E49347C1 /* ReactNativeDependenciesHeaders */,
+				3AFDEFB917B01458307FDE0A /* Autolinked */,
+				947DD5EF3BE079FB7F5AFF87 /* ReactCodegen */,
+				F3857EDDA38AFC0011322D6D /* ReactAppDependencyProvider */,
+			);
 			productName = DocumentScannerExampleSpm;
 			productReference = 13B07F961A680F5B00A75B9A /* DocumentScannerExampleSpm.app */;
 			productType = "com.apple.product-type.application";
@@ -126,11 +118,6 @@
 
 /* Begin PBXProject section */
 		83CBB9F71A601CBA00E9B192 /* Project object */ = {
-			packageReferences = (
-				27BDE9D743CB351F53154525 /* XCLocalSwiftPackageReference "build/xcframeworks" */,
-				C2FECF1430FDAAE3BF355839 /* XCLocalSwiftPackageReference "build/generated/autolinking" */,
-				A700952B9A737913514EB28F /* XCLocalSwiftPackageReference "build/generated/ios" */,
-			);
 			isa = PBXProject;
 			attributes = {
 				LastUpgradeCheck = 1210;
@@ -149,6 +136,11 @@
 				Base,
 			);
 			mainGroup = 83CBB9F61A601CBA00E9B192;
+			packageReferences = (
+				27BDE9D743CB351F53154525 /* XCLocalSwiftPackageReference "xcframeworks" */,
+				C2FECF1430FDAAE3BF355839 /* XCLocalSwiftPackageReference "autolinking" */,
+				A700952B9A737913514EB28F /* XCLocalSwiftPackageReference "ios" */,
+			);
 			productRefGroup = 83CBBA001A601CBA00E9B192 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -299,7 +291,6 @@
 				"RN_SPM_REACT_BINARY[sdk=iphoneos*]" = "$(SRCROOT)/build/xcframeworks/$(RN_SPM_FLAVOR)/React.xcframework/ios-arm64/React.framework/React";
 				"RN_SPM_REACT_FRAMEWORK[sdk=iphoneos*]" = "$(SRCROOT)/build/xcframeworks/$(RN_SPM_FLAVOR)/React.xcframework/ios-arm64/React.framework";
 				RN_SPM_FLAVOR = debug;
-				HERMES_CLI_PATH = "/Users/preeternal/Projects/react-native-document-scanner-plugin/example-spm/node_modules/hermes-compiler/hermesc/osx-bin/hermesc";
 				REACT_NATIVE_PATH = "../node_modules/react-native";
 				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				FRAMEWORK_SEARCH_PATHS = (
@@ -400,7 +391,6 @@
 				"RN_SPM_REACT_BINARY[sdk=iphoneos*]" = "$(SRCROOT)/build/xcframeworks/$(RN_SPM_FLAVOR)/React.xcframework/ios-arm64/React.framework/React";
 				"RN_SPM_REACT_FRAMEWORK[sdk=iphoneos*]" = "$(SRCROOT)/build/xcframeworks/$(RN_SPM_FLAVOR)/React.xcframework/ios-arm64/React.framework";
 				RN_SPM_FLAVOR = release;
-				HERMES_CLI_PATH = "/Users/preeternal/Projects/react-native-document-scanner-plugin/example-spm/node_modules/hermes-compiler/hermesc/osx-bin/hermesc";
 				REACT_NATIVE_PATH = "../node_modules/react-native";
 				CLANG_CXX_LANGUAGE_STANDARD = "c++20";
 				FRAMEWORK_SEARCH_PATHS = (
@@ -601,21 +591,54 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
 /* Begin XCLocalSwiftPackageReference section */
-		27BDE9D743CB351F53154525 /* XCLocalSwiftPackageReference "build/xcframeworks" */ = {isa = XCLocalSwiftPackageReference; relativePath = build/xcframeworks;};
-		C2FECF1430FDAAE3BF355839 /* XCLocalSwiftPackageReference "build/generated/autolinking" */ = {isa = XCLocalSwiftPackageReference; relativePath = build/generated/autolinking;};
-		A700952B9A737913514EB28F /* XCLocalSwiftPackageReference "build/generated/ios" */ = {isa = XCLocalSwiftPackageReference; relativePath = build/generated/ios;};
+		27BDE9D743CB351F53154525 /* XCLocalSwiftPackageReference "xcframeworks" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = build/xcframeworks;
+		};
+		A700952B9A737913514EB28F /* XCLocalSwiftPackageReference "ios" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = build/generated/ios;
+		};
+		C2FECF1430FDAAE3BF355839 /* XCLocalSwiftPackageReference "autolinking" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = build/generated/autolinking;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		512EBECF5434FD7A6AF7C967 /* ReactHeaders */ = {isa = XCSwiftPackageProductDependency; package = 27BDE9D743CB351F53154525 /* XCLocalSwiftPackageReference "build/xcframeworks" */; productName = ReactHeaders;};
-		920F69A9DF98D37C8308D020 /* ReactNativeHeaders */ = {isa = XCSwiftPackageProductDependency; package = 27BDE9D743CB351F53154525 /* XCLocalSwiftPackageReference "build/xcframeworks" */; productName = ReactNativeHeaders;};
-		8332BE36B9C49BD2E49347C1 /* ReactNativeDependenciesHeaders */ = {isa = XCSwiftPackageProductDependency; package = 27BDE9D743CB351F53154525 /* XCLocalSwiftPackageReference "build/xcframeworks" */; productName = ReactNativeDependenciesHeaders;};
-		3AFDEFB917B01458307FDE0A /* Autolinked */ = {isa = XCSwiftPackageProductDependency; package = C2FECF1430FDAAE3BF355839 /* XCLocalSwiftPackageReference "build/generated/autolinking" */; productName = Autolinked;};
-		947DD5EF3BE079FB7F5AFF87 /* ReactCodegen */ = {isa = XCSwiftPackageProductDependency; package = A700952B9A737913514EB28F /* XCLocalSwiftPackageReference "build/generated/ios" */; productName = ReactCodegen;};
-		F3857EDDA38AFC0011322D6D /* ReactAppDependencyProvider */ = {isa = XCSwiftPackageProductDependency; package = A700952B9A737913514EB28F /* XCLocalSwiftPackageReference "build/generated/ios" */; productName = ReactAppDependencyProvider;};
+		3AFDEFB917B01458307FDE0A /* Autolinked */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C2FECF1430FDAAE3BF355839 /* XCLocalSwiftPackageReference "autolinking" */;
+			productName = Autolinked;
+		};
+		512EBECF5434FD7A6AF7C967 /* ReactHeaders */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 27BDE9D743CB351F53154525 /* XCLocalSwiftPackageReference "xcframeworks" */;
+			productName = ReactHeaders;
+		};
+		8332BE36B9C49BD2E49347C1 /* ReactNativeDependenciesHeaders */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 27BDE9D743CB351F53154525 /* XCLocalSwiftPackageReference "xcframeworks" */;
+			productName = ReactNativeDependenciesHeaders;
+		};
+		920F69A9DF98D37C8308D020 /* ReactNativeHeaders */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 27BDE9D743CB351F53154525 /* XCLocalSwiftPackageReference "xcframeworks" */;
+			productName = ReactNativeHeaders;
+		};
+		947DD5EF3BE079FB7F5AFF87 /* ReactCodegen */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A700952B9A737913514EB28F /* XCLocalSwiftPackageReference "ios" */;
+			productName = ReactCodegen;
+		};
+		F3857EDDA38AFC0011322D6D /* ReactAppDependencyProvider */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A700952B9A737913514EB28F /* XCLocalSwiftPackageReference "ios" */;
+			productName = ReactAppDependencyProvider;
+		};
 /* End XCSwiftPackageProductDependency section */
-
 	};
 	rootObject = 83CBB9F71A601CBA00E9B192 /* Project object */;
 }

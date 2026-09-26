@@ -1,5 +1,5 @@
 PODS:
-  - DocumentScanner (0.3.0):
+  - DocumentScanner (0.4.2):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2122,7 +2122,7 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
 SPEC CHECKSUMS:
-  DocumentScanner: 419b4806197bcc4c7c052659c5e61b1c5973caba
+  DocumentScanner: 57ae8ce3b4e748a87639c56895496ed7a681dba3
   FBLazyVector: c00c20551d40126351a6783c47ce75f5b374851b
   hermes-engine: 9a88dd2231abdec4338c38d26ce272bc04d43e7c
   RCTDeprecation: 3bb167081b134461cfeb875ff7ae1945f8635257
@@ -2200,6 +2200,6 @@ SPEC CHECKSUMS:
   ReactNativeDependencies: dafe211ace8200547c6677001e42cba4cf7f56a9
   Yoga: e83c3121d079541e69f3c5c623faaaf933fb5812
 
-PODFILE CHECKSUM: 8dc292c06a53a16c10a8c7e23b8a4eb3d4bb1d29
+PODFILE CHECKSUM: 829560c45eedcdbffc8aebcd5cfbd1a5fa911358
 
 COCOAPODS: 1.15.2

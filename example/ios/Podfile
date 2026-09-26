@@ -37,5 +37,14 @@ target 'DocumentScannerExample' do
         config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       end
     end
+
+    # React Native's RNCore switcher assumes that a marker-less prebuilt
+    # framework is Debug. CocoaPods caches can restore a Release framework
+    # without that marker, leaving Debug builds with missing C++ symbols.
+    rncore_path = File.join(installer.sandbox.root.to_s, 'React-Core-prebuilt')
+    if File.directory?(rncore_path)
+      marker_path = File.join(rncore_path, '.last_build_configuration')
+      File.write(marker_path, 'Unconfigured') unless File.exist?(marker_path)
+    end
   end
 end

@@ -2,6 +2,22 @@
 
 ---
 
+## v0.4.3 (Unreleased) — SwiftPM setup fixes
+
+- The React Native 0.87 example now refreshes SwiftPM packages whenever you
+  build or run iOS. A fresh checkout needs no separate setup command.
+- The checked-in Xcode project no longer contains a local path to the Hermes
+  compiler. SwiftPM updates remove that path if React Native adds it again.
+- The library's SwiftPM target now builds with the New Architecture settings
+  required by React Native 0.87.
+- The CocoaPods example's Debug builds now recover correctly if React Native
+  restores the Release prebuilt core from cache without its configuration
+  marker.
+
+CocoaPods remains the default installation method. There are no API changes.
+
+---
+
 ## v0.4.2 AGP 9 Kotlin compatibility fix
 
 ### Fixed

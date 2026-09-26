@@ -11,11 +11,19 @@ For a fresh clone:
 
 ```sh
 yarn install
-yarn example:spm ios
+yarn example:spm build:ios
 ```
 
 The initial CocoaPods-to-SPM migration has already been applied to the committed
-Xcode project; do not run `--deintegrate` again.
+Xcode project. Both `ios` and `build:ios` refresh SwiftPM before invoking Xcode,
+so a fresh checkout needs no separate setup command. Use `spm:setup` only if the
+Xcode project is regenerated from a CocoaPods template; it runs `pod deintegrate`
+and therefore requires CocoaPods.
+
+The `ios/Podfile` is only a React Native CLI project-discovery stub. It installs
+nothing and deliberately fails if somebody runs `pod install`. The setup
+scripts also remove React Native 0.87.1's machine-specific `HERMES_CLI_PATH`
+from the committed Xcode files after every SwiftPM refresh.
 
 This project was bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
 
@@ -53,15 +61,16 @@ yarn android
 
 ### iOS
 
-Initialize React Native's SwiftPM integration after a fresh clone or in CI:
+Build the SwiftPM example from a fresh clone or in CI:
 
 ```sh
-yarn example:spm spm:setup
+yarn example:spm build:ios
 ```
 
 The repository carries `patch-package` manifests for dependencies that do not
-ship working SwiftPM support. The setup script then runs the integration with a
-Podfile-free React Native CLI config wrapper.
+ship working SwiftPM support. The build applies those patches and refreshes the
+integration through React Native's standard CLI project discovery before Xcode
+starts.
 
 ```sh
 # Using npm
@@ -71,11 +80,12 @@ npm run ios
 yarn ios
 ```
 
-The `ios` script performs SwiftPM setup and builds for a generic iOS Simulator.
+The `ios` and `build:ios` scripts refresh SwiftPM and build for a generic iOS
+Simulator.
 Open `ios/DocumentScannerExampleSpm.xcodeproj` in Xcode when you want to run it
-on a specific simulator or device; React Native CLI 20.2 still discovers Apple
-projects through Podfile lookup and cannot run this Podfile-free example
-directly.
+on a specific simulator or device. React Native CLI 20.2 still discovers Apple
+projects through Podfile lookup, so this example carries a non-installable
+discovery stub while remaining SwiftPM-only.
 
 This is one way to run your app — you can also build it directly from Android Studio or Xcode.
 

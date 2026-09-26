@@ -373,9 +373,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-react-native-spm-
 
-      - name: Generate SwiftPM integration
-        run: yarn example:spm spm:setup
-
       - name: Build RN 0.87 SwiftPM example for iOS
         run: |
           set -euo pipefail
@@ -387,6 +384,9 @@ jobs:
             echo "::endgroup::"
             exit 1
           fi
+
+      - name: Verify podless integration
+        run: test ! -d example-spm/ios/Pods
 
       - name: Upload iOS SwiftPM build log
         if: always()
